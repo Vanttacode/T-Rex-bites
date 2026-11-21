@@ -1,0 +1,17 @@
+# T-Rex Bites boot menu (computers that start in BIOS / Legacy mode)
+path
+include trexbites-style.cfg
+default vesamenu.c32
+prompt 0
+timeout 0
+menu title T-Rex Bites - instalador
+
+label install
+    menu label ^Instalar T-Rex Bites
+    menu default
+    kernel vesamenu.c32
+    append trexbites-confirm.cfg
+
+label disk
+    menu label ^Salir (arrancar normalmente desde el disco)
+    localboot 0x80

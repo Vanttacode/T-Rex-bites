@@ -1,0 +1,15 @@
+# Named fs42.service so FieldStation42's own web console can restart it.
+[Unit]
+Description=T-Rex Bites - reproductor de tele (FieldStation42)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/trexbites/fieldstation42
+ExecStart=/opt/trexbites/fieldstation42/env/bin/python3 field_player.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=trexbites-x11.target

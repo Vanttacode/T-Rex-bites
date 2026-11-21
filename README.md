@@ -1,89 +1,135 @@
-# AstroJS Boilerplate
+# 🦖📺 T-Rex Bites
+
+**Tu propio canal de televisión de los 2000, en casa.**
+
+T-Rex Bites convierte cualquier computador viejo en una tele con canales,
+horarios y programación propia. Tú subes los programas desde el teléfono y la
+tele los va pasando sola, como un canal de verdad: prendes y ya hay algo dando.
+
+- 📼 **Canales con horario**: dibujos en la mañana, películas en la tarde y
+  "fin de transmisión" en la noche.
+- 📱 **Se administra desde el teléfono o el PC** en `http://trexbites.local`:
+  control remoto, subir videos, borrar programas y PIN de padres.
+- 💿 **Se instala solo**: un USB, dos confirmaciones y listo. No hay que saber Linux.
+- 🏠 **100 % local**: todo queda en el disco del equipo, sin internet ni cuentas.
+
+> Funciona sobre [FieldStation42](https://github.com/shane-mason/FieldStation42),
+> un simulador de TV abierta y cable hecho por Shane Mason. Ver [NOTICE.md](NOTICE.md).
 
 ---
 
-This repository is what we call a "subtree split": a read-only copy of one directory of the main repository. If you want to report or contribute, you should do it on the main repository: https://github.com/CrystallizeAPI/boilerplates.
+## Instalar en un computador
+
+### 1. Crear el USB (una sola vez)
+
+En un computador con Linux (o WSL en Windows):
+
+```bash
+sudo apt install xorriso curl
+./iso/build-iso.sh
+```
+
+Queda el archivo `iso/out/trexbites.iso`. Grábalo en un USB (de 2 GB o más) con
+[balenaEtcher](https://etcher.balena.io/).
+
+Opciones útiles al crear el USB:
+
+```bash
+# WiFi de la casa (para instalar sin cable de red)
+TREX_WIFI_SSID="MiWifi" TREX_WIFI_PASSWORD="clave" ./iso/build-iso.sh
+
+# Otro país o teclado (por defecto: Chile y teclado latinoamericano)
+TREX_LOCALE=es_AR.UTF-8 TREX_TIMEZONE=America/Argentina/Buenos_Aires ./iso/build-iso.sh
+TREX_LOCALE=es_ES.UTF-8 TREX_KEYMAP=es TREX_TIMEZONE=Europe/Madrid ./iso/build-iso.sh
+```
+
+### 2. Instalar
+
+> ⚠️ **La instalación borra todo el disco del computador.**
+
+1. Conecta el USB y el cable de red (o usa un USB creado con tu WiFi).
+2. Prende el computador y elige arrancar desde el USB. Según la marca, hay que
+   presionar **F12**, **F9**, **F2**, **Esc** o **Novo** (Lenovo) al encenderlo.
+3. Elige **Instalar T-Rex Bites** y luego **Sí, borrar el disco e instalar**.
+4. Espera de 15 a 40 minutos, según el equipo y la velocidad de internet. El
+   computador se reinicia solo y aparece la tele.
+
+### 3. Usar
+
+Desde un teléfono o un PC conectado al mismo WiFi, abre **http://trexbites.local**.
+El PIN de fábrica es **1234** y el panel te pide cambiarlo la primera vez.
+
+Para tenerlo como app en el teléfono, en el navegador usa
+**"Agregar a pantalla de inicio"**.
 
 ---
 
-The product storytelling boilerplate is a minimal eCommerce boilerplate built using AstroJS and Crystallize. You can also check out the [live demo](https://dounot.milliseconds.live/) (deploy it) of this boilerplate.
+## ¿En qué computadores funciona?
 
-![dounut-astro-local](https://github.com/CrystallizeAPI/boilerplates/assets/26195876/dfe351b9-69dc-4e9e-947b-e89ff07151a7)
+| Equipo | ¿Funciona? |
+|---|---|
+| Notebooks y PCs de 64 bits (aprox. 2008 en adelante) | ✅ |
+| Mini PCs (Intel NUC, Beelink, etc.) | ✅ |
+| Mac con procesador Intel | ⚠️ En general sí; el WiFi puede fallar |
+| CPUs muy antiguas sin SSE4.1 (Core 2, Atom de 1ª gen., AMD E-350) | ⚠️ Ver [docs/HARDWARE.md](docs/HARDWARE.md) |
+| Raspberry Pi | 🔜 Planeado (otra imagen) |
+| PCs de 32 bits, Mac M1/M2, tablets, celulares, Smart TV | ❌ (los celulares sirven como control remoto) |
 
+Requisitos mínimos recomendados: 2 GB de RAM (4 GB ideal) y 32 GB de disco.
 
+---
 
-## What this guide covers:
-
-- Setting up your project
-- Instructions for running the project
-- Accessing the development site
-- Folder structure of the boilerplate
-- Editing the components and the theme
-- Deploying the project
-
-## Getting Started
-
-To get started, head over to GitHub and clone [the repository](https://github.com/CrystallizeAPI/dounut-astro). Make sure to install all the required packages by running the following command for both the folders:
-
-```bash
-npm install
+## Cómo está hecho
 
 ```
-
-## Running the Project
-
-Running the project in development is straightforward. To start the development server, run the following command:
-
-```bash
-npm run dev
-
+USB T-Rex Bites
+ └─ Instalador de Debian 13 automático (iso/)
+     └─ Debian mínimo, sin escritorio
+         ├─ Arranca directo en la tele (usuario "tv", sin login)
+         ├─ FieldStation42 + mpv  → la imagen en pantalla      (/opt/trexbites/fieldstation42)
+         ├─ Panel web T-Rex Bites → http://trexbites.local    (/opt/trexbites/panel)
+         └─ Videos en el disco local                          (/srv/trexbites/catalog)
 ```
 
-## Accessing the Development Site
+| Carpeta | Qué hay |
+|---|---|
+| `iso/` | Generador del USB: instalación de Debian preconfigurada y menús de arranque |
+| `system/` | Instalador que convierte un Debian mínimo en la tele, más los canales por defecto |
+| `panel/` | Panel web (FastAPI + HTML) para el teléfono y el PC |
+| `upstream/` | Versión exacta de FieldStation42 que se usa |
+| `docs/` | Documentación adicional |
 
-Once the development server is running, you will be able to browse to http://localhost:4321/.
+### Canales por defecto
 
-<img width="1437" alt="dounut-astro-dev-server" src="https://github.com/CrystallizeAPI/boilerplates/assets/26195876/d615da75-54dc-4866-a8fd-5054fca3a23e">
+| Canal | Tipo | Qué pasa |
+|---|---|---|
+| **3 · T-Rex TV** | Con horario | 7–10 h *Mañana*, 10–13 h *Dibujos*, 13–15 h *Educativos*, 15–18 h *Dibujos*, 18 h *Películas*, 20 h fin de transmisión |
+| **5 · Dino Loop** | Repetición continua | Todos sus videos en loop, a cualquier hora |
 
+Los horarios y canales se pueden cambiar en la consola avanzada de
+FieldStation42 (`http://trexbites.local:4242`, enlazada desde Ajustes).
 
-## Folder Structure
+### Instalar en un Debian que ya tienes
 
-This section provides you with a better understanding of the folder structure.
+```bash
+git clone https://github.com/vanttacode/T-Rex-bites.git
+sudo ./T-Rex-bites/system/install-trexbites.sh
+```
 
-**src/components**
+### Desarrollo del panel
 
-Contains all the components used throughout the application
+```bash
+cd panel
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+pytest
+# probar la interfaz sin tele (el control remoto dirá "La tele no responde")
+mkdir -p /tmp/fs42 && cp -r ../system/defaults/confs /tmp/fs42/
+TREXBITES_FS42_DIR=/tmp/fs42 TREXBITES_STATE=/tmp/fs42/panel.json uvicorn trexbites_panel.app:app --reload
+```
 
-**src/use-cases**
+---
 
-Includes the GraphQL queries and mutations used to communicate with Crystallize.
+## Estado
 
-**src/pages**
-
-Has all the individual pages the website contains.
-
-## Editing the theme
-
-All the theme related information can be edited in the **tailwind.config.js** file. This includes the colors, spacing, typography used throughout the application.
-
-## Editing the components
-
-Components can be edited by heading over to the **components** folder in **src.**
-
-### Frontpage
-
-The frontpage contains a grid and it is fetching all the grid related information (including the layout) from Crystallize. You can directly edit the grid in Crystallize for changes to take effect. Editing the styling such as the background and typography can be done in the **grid-item** component.
-
-![frontpage-dounut-astro-grid](https://github.com/CrystallizeAPI/boilerplates/assets/26195876/80bebeb5-c2eb-4a96-9721-392bac109e17)
-
-### Product
-
-Individual product pages are using two components - one is the **product** component that contains the hero section, and the ‘Add to cart’ button and then the **product-body** component that can be edited to change the layout of the marketing information displayed on the page.
-
-### Cart, Checkout, and Confirmation
-
-The basket, checkout, and the confirmation pages can be edited in their respective files located in the pages folder.
-
-
-> Please note that this boilerplate does not contain payment integrations such as Stripe. It is using a dummy payment method.
->
+Primera versión (base). Ver [docs/ROADMAP.md](docs/ROADMAP.md) para lo que falta.

@@ -1,0 +1,18 @@
+# Second screen: the person confirms erasing the disk
+path
+include trexbites-style.cfg
+default vesamenu.c32
+prompt 0
+timeout 0
+menu title ATENCION: se BORRARA TODO el disco de este computador
+
+label no
+    menu label ^No, volver
+    menu default
+    kernel vesamenu.c32
+    append isolinux.cfg
+
+label yes
+    menu label ^Si, borrar el disco e instalar T-Rex Bites
+    kernel /install.amd/vmlinuz
+    append initrd=/install.amd/initrd.gz @KERNEL_ARGS@

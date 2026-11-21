@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>T-Rex Bites</title>
+  <meta name="theme-color" content="#1b1f3b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="T-Rex Bites">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <img src="/static/icon.svg" alt="" class="logo">
+    <div>
+      <h1>T-Rex Bites</h1>
+      <p class="tagline">Tu canal de tele en casa</p>
+    </div>
+    <span id="onair" class="onair" hidden>● EN EL AIRE</span>
+  </header>
+
+  <!-- PIN -->
+  <section id="view-login" class="view" hidden>
+    <div class="card center">
+      <h2>Ingresa el PIN</h2>
+      <p class="muted">El PIN de fábrica es <b>1234</b>. Te pediremos cambiarlo.</p>
+      <div class="pin-dots" id="pin-dots"><span></span><span></span><span></span><span></span></div>
+      <div class="keypad" id="keypad"></div>
+      <p class="error" id="login-error" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- App -->
+  <main id="view-app" hidden>
+    <section id="tab-remote" class="tab">
+      <div class="card">
+        <div class="now" id="now-playing">Conectando con la tele…</div>
+      </div>
+      <div class="remote">
+        <button class="rbtn big" data-remote="up" aria-label="Canal siguiente">CH ▲</button>
+        <button class="rbtn big" data-remote="volume_up" aria-label="Subir volumen">VOL ＋</button>
+        <button class="rbtn big" data-remote="down" aria-label="Canal anterior">CH ▼</button>
+        <button class="rbtn big" data-remote="volume_down" aria-label="Bajar volumen">VOL －</button>
+        <button class="rbtn" data-remote="guide">📺 Guía</button>
+        <button class="rbtn" data-remote="mute">🔇 Silencio</button>
+      </div>
+      <h3 class="section-title">Canales</h3>
+      <div class="channel-list" id="channel-buttons"></div>
+    </section>
+
+    <section id="tab-upload" class="tab" hidden>
+      <div class="card">
+        <h2>Subir programas</h2>
+        <label class="field">Canal
+          <select id="up-channel"></select>
+        </label>
+        <label class="field">Categoría
+          <select id="up-tag"></select>
+        </label>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="up-files" accept="video/*,.mkv,.avi,.mpg,.ts" multiple>
+          <span>📼 Toca aquí o arrastra videos</span>
+        </label>
+        <p class="muted" id="disk-info"></p>
+      </div>
+      <ul class="uploads" id="upload-list"></ul>
+    </section>
+
+    <section id="tab-library" class="tab" hidden>
+      <div id="library"></div>
+    </section>
+
+    <section id="tab-settings" class="tab" hidden>
+      <div class="card" id="pin-card">
+        <h2>Cambiar PIN</h2>
+        <p class="warning" id="pin-default-warning" hidden>Todavía usas el PIN de fábrica (1234). Cámbialo para que nadie más pueda cambiar la programación.</p>
+        <label class="field">PIN actual <input type="password" inputmode="numeric" id="pin-current" autocomplete="current-password"></label>
+        <label class="field">PIN nuevo (4 a 8 números) <input type="password" inputmode="numeric" id="pin-new" autocomplete="new-password"></label>
+        <button class="btn" id="pin-save">Guardar PIN</button>
+        <p class="error" id="pin-msg" role="status"></p>
+      </div>
+      <div class="card">
+        <h2>Opciones avanzadas</h2>
+        <p class="muted">Para editar horarios y canales a fondo, usa la consola de FieldStation42.</p>
+        <a class="btn ghost" id="advanced-link" href="#" target="_blank" rel="noopener">Abrir consola avanzada</a>
+      </div>
+      <div class="card">
+        <button class="btn ghost" id="logout">Cerrar sesión en este aparato</button>
+      </div>
+    </section>
+
+    <nav class="tabbar">
+      <button data-tab="remote" class="active">🎮<span>Control</span></button>
+      <button data-tab="upload">📤<span>Subir</span></button>
+      <button data-tab="library">📚<span>Programas</span></button>
+      <button data-tab="settings">⚙️<span>Ajustes</span></button>
+    </nav>
+  </main>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
