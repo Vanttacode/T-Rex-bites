@@ -7,6 +7,9 @@ curl
 python3
 python3-venv
 python3-pip
+# FieldStation42 draws its guide channel with Tkinter: without it the player
+# stops right at start (ModuleNotFoundError: tkinter) and the screen stays black
+python3-tk
 mpv
 ffmpeg
 fonts-dejavu-core
