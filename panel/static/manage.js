@@ -250,6 +250,7 @@ function typeLabel(c) {
 
 async function openMoreTab() {
   loadWifi();
+  loadUpdate(false);
   renderHistory();
   try { await loadChannels(); } catch (e) { toast(e.message); return; }
   $("ch-list").replaceChildren(...channelsCache.map((c) => el("div", { class: "ch-row" },
@@ -274,6 +275,29 @@ function openEditor(channel) {
   document.querySelector('input[name="ch-type"][value="standard"]').checked = true;
   $("ch-delete").hidden = !channel;
   $("ch-msg").textContent = "";
+  // commercials and logo are set once the channel exists
+  const scheduled = channel && channel.type === "standard";
+  $("ch-ads-field").hidden = !scheduled;
+  $("ch-logo-field").hidden = !channel;
+  $("ch-new-note").hidden = !!channel;
+  if (scheduled) {
+    const ads = channel.ads || { enabled: false, strategy: "end", duration: 120 };
+    $("ch-ads-on").checked = ads.enabled;
+    $("ch-ads-strategy").value = ads.strategy;
+    const dur = $("ch-ads-duration");
+    if (![...dur.options].some((o) => Number(o.value) === ads.duration)) {
+      dur.append(el("option", { value: String(ads.duration) }, `${ads.duration} segundos`));
+    }
+    dur.value = String(ads.duration);
+    $("ch-ads-opts").hidden = !ads.enabled;
+  }
+  if (channel) {
+    const logo = channel.logo || { show: true, permanent: true, custom: false };
+    $("ch-logo-show").checked = logo.show;
+    $("ch-logo-permanent").checked = logo.permanent;
+    $("ch-logo-reset").hidden = !logo.custom;
+    refreshLogoPreview(channel.name);
+  }
   renderCats();
   $("ch-editor").hidden = false;
   $("ch-editor").scrollIntoView({ behavior: "smooth" });
@@ -310,7 +334,15 @@ async function saveChannel() {
   $("ch-msg").textContent = "";
   try {
     if (editor.channel) {
-      if (editor.channel.type === "standard") body.categories = categories;
+      if (editor.channel.type === "standard") {
+        body.categories = categories;
+        body.ads = {
+          enabled: $("ch-ads-on").checked,
+          strategy: $("ch-ads-strategy").value,
+          duration: Number($("ch-ads-duration").value),
+        };
+      }
+      body.logo = { show: $("ch-logo-show").checked, permanent: $("ch-logo-permanent").checked };
       await api(`/api/channels/${encodeURIComponent(editor.channel.name)}`, { method: "PUT", json: body });
       toast("Canal guardado");
     } else {
@@ -333,6 +365,35 @@ async function deleteChannel() {
     toast("Canal borrado");
     $("ch-editor").hidden = true;
     openMoreTab();
+  } catch (e) { $("ch-msg").textContent = e.message; }
+}
+
+function refreshLogoPreview(name) {
+  $("ch-logo-img").src = `/api/channels/${encodeURIComponent(name)}/logo?t=${Date.now()}`;
+}
+
+async function uploadLogo(file) {
+  if (!file || !editor.channel) return;
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const resp = await fetch(`/api/channels/${encodeURIComponent(editor.channel.name)}/logo`,
+      { method: "POST", body: form, credentials: "same-origin" });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || `Error ${resp.status}`);
+    toast("Logo guardado. La tele lo muestra en unos segundos.");
+    $("ch-logo-reset").hidden = false;
+    refreshLogoPreview(editor.channel.name);
+  } catch (e) { $("ch-msg").textContent = e.message; }
+}
+
+async function resetLogo() {
+  if (!editor.channel) return;
+  try {
+    await api(`/api/channels/${encodeURIComponent(editor.channel.name)}/logo`, { method: "DELETE" });
+    toast("Ahora usa el logo de T-Rex Bites");
+    $("ch-logo-reset").hidden = true;
+    refreshLogoPreview(editor.channel.name);
   } catch (e) { $("ch-msg").textContent = e.message; }
 }
 
@@ -381,6 +442,9 @@ function wireManagement() {
   $("ch-cat-add").addEventListener("click", addCat);
   $("ch-cat-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCat(); } });
   document.querySelectorAll('input[name="ch-type"]').forEach((r) => r.addEventListener("change", renderCats));
+  $("ch-ads-on").addEventListener("change", (e) => { $("ch-ads-opts").hidden = !e.target.checked; });
+  $("ch-logo-file").addEventListener("change", (e) => { uploadLogo(e.target.files[0]); e.target.value = ""; });
+  $("ch-logo-reset").addEventListener("click", resetLogo);
   window.addEventListener("beforeunload", (e) => { if (sched.dirty) e.preventDefault(); });
 }
 

@@ -111,18 +111,23 @@ mkdir -p "$PREFIX" "$MEDIA_DIR/catalog" "$MEDIA_DIR/.uploads" "$STATE_DIR"
 chown "$TV_USER:$TV_USER" "$PREFIX" "$MEDIA_DIR" "$MEDIA_DIR/catalog" "$MEDIA_DIR/.uploads" "$STATE_DIR"
 
 # ---------------------------------------------------------------------------
-if [ "$OFFLINE" = 1 ]; then
+FS42_MARK="$FS42_DIR/.trexbites-commit"
+as_tv mkdir -p "$FS42_DIR"
+if [ "$(cat "$FS42_MARK" 2>/dev/null)" = "$FS42_COMMIT" ]; then
+    step "FieldStation42 (motor de la tele) ya está en la versión $FS42_COMMIT"
+elif [ "$OFFLINE" = 1 ]; then
     step "Copiando FieldStation42 (motor de la tele) desde el USB"
-    as_tv mkdir -p "$FS42_DIR"
-    # an update never touches confs/ or runtime/: those hold the person's settings
+    # confs/ and runtime/ hold the person's settings: never overwritten
     as_tv tar -xzf "$OFFLINE_DIR/fieldstation42.tar.gz" -C "$FS42_DIR" --exclude=./confs --exclude=./runtime
+    echo "$FS42_COMMIT" | as_tv tee "$FS42_MARK" >/dev/null
 else
     step "Descargando FieldStation42 (motor de la tele) en la versión $FS42_COMMIT"
-    if [ ! -d "$FS42_DIR/.git" ]; then
-        as_tv git clone "$FS42_REPO" "$FS42_DIR"
-    fi
-    as_tv git -C "$FS42_DIR" fetch --quiet origin
-    as_tv git -C "$FS42_DIR" -c advice.detachedHead=false checkout --quiet "$FS42_COMMIT"
+    FS42_TGZ=$(mktemp)
+    curl -fsSL --retry 4 "${FS42_REPO%.git}/archive/$FS42_COMMIT.tar.gz" -o "$FS42_TGZ"
+    as_tv tar -xzf "$FS42_TGZ" -C "$FS42_DIR" --strip-components=1 \
+        --exclude='*/confs' --exclude='*/runtime'
+    rm -f "$FS42_TGZ"
+    echo "$FS42_COMMIT" | as_tv tee "$FS42_MARK" >/dev/null
 fi
 
 # videos live on /srv so the engine can be reinstalled without touching them
@@ -256,12 +261,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+step "Instalando las actualizaciones a distancia"
+install -m 644 "$SRC_DIR/VERSION" "$PREFIX/VERSION" 2>/dev/null || echo "0.0.0" > "$PREFIX/VERSION"
+install -d "$PREFIX/bin"
+install -m 755 "$SRC_DIR/system/trexbites-update.sh" "$PREFIX/bin/trexbites-update"
+install -m 644 "$SRC_DIR/upstream/trexbites.conf" "$PREFIX/trexbites.conf"
+
+# ---------------------------------------------------------------------------
 step "Configurando el arranque directo a la tele"
 cp -r "$SRC_DIR/system/rootfs/." /
 install -d -o "$TV_USER" -g "$TV_USER" "$TV_HOME/.config/systemd/user"
 cp -r "$SRC_DIR/system/home/tv/." "$TV_HOME/"
 chmod +x "$TV_HOME/.xinitrc"
 chown -R "$TV_USER:$TV_USER" "$TV_HOME"
+
+# channel logos and the channel banner are drawn by FieldStation42's OSD;
+# osd/osd.json is the person's own file, so it is only written the first time
+if [ ! -f "$FS42_DIR/osd/osd.json" ]; then
+    install -o "$TV_USER" -g "$TV_USER" -m 644 "$SRC_DIR/system/defaults/osd.json" "$FS42_DIR/osd/osd.json"
+fi
+install -m 644 "$SRC_DIR/panel/static/icon-512.png" "$PREFIX/media/logo_trexbites.png"
+install -d -o "$TV_USER" -g "$TV_USER" "$TV_HOME/.config/systemd/user/fs42.service.wants"
+ln -sfn ../fs42-osd.service "$TV_HOME/.config/systemd/user/fs42.service.wants/fs42-osd.service"
+chown -h "$TV_USER:$TV_USER" "$TV_HOME/.config/systemd/user/fs42.service.wants/fs42-osd.service"
 
 # the TV starts when the tv user's screen session starts
 install -d -o "$TV_USER" -g "$TV_USER" "$TV_HOME/.config/systemd/user/trexbites-x11.target.wants"
@@ -282,6 +304,18 @@ if grep -q '^127.0.1.1' /etc/hosts; then
     sed -i -E "s/^127\.0\.1\.1.*/127.0.1.1\t$HOSTNAME_TV/" /etc/hosts
 else
     printf '127.0.1.1\t%s\n' "$HOSTNAME_TV" >> /etc/hosts
+fi
+
+step "Enlaces fijos al kernel"
+if ! grep -qs '^do_symlinks *= *yes' /etc/kernel-img.conf; then
+    sed -i '/^do_symlinks/d' /etc/kernel-img.conf 2>/dev/null || true
+    echo "do_symlinks = yes" >> /etc/kernel-img.conf
+fi
+LATEST_KERNEL=$(find /boot -maxdepth 1 -name 'vmlinuz-*' | sort -V | tail -n 1)
+if [ -n "$LATEST_KERNEL" ]; then
+    KVER=${LATEST_KERNEL#/boot/vmlinuz-}
+    ln -sfn "boot/vmlinuz-$KVER" /vmlinuz
+    [ -e "/boot/initrd.img-$KVER" ] && ln -sfn "boot/initrd.img-$KVER" /initrd.img
 fi
 
 step "Menú de arranque"
@@ -356,4 +390,9 @@ echo "Reinicia el equipo. Luego abre http://$HOSTNAME_TV.local desde tu teléfon
 if [ "$LIVE_SYSTEMD" = 1 ]; then
     systemctl daemon-reload
     systemctl restart avahi-daemon.service trexbites-panel.service || true
+    # the tv user's own services (player, logo, bedtime screen)
+    systemctl --user --machine="$TV_USER@" daemon-reload 2>/dev/null || true
+    if systemctl --user --machine="$TV_USER@" is-active --quiet fs42.service 2>/dev/null; then
+        systemctl --user --machine="$TV_USER@" restart fs42.service || true
+    fi
 fi

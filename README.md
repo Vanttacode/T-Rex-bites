@@ -65,7 +65,8 @@ El USB ofrece dos formas de instalar:
 | Opción del menú | Para qué |
 |---|---|
 | **Instalar T-Rex Bites** | Computador dedicado a la tele. ⚠️ **Borra todo el disco.** |
-| **Instalar al lado de otro sistema** | Computador que ya tiene Linux (o Windows) y quieres conservar. Usa solo el espacio libre sin particionar; al prender eliges cuál arrancar. Ver la guía [Instalar al lado de otro sistema](docs/INSTALAR-JUNTO-A-OTRO-SISTEMA.md). |
+| **Instalar al lado de otro Linux** | Computador con Fedora, Ubuntu, etc. que quieres conservar. Usa solo el espacio sin asignar y no toca tu Linux; después un comando agrega T-Rex Bites a su menú. Ver [la guía](docs/INSTALAR-JUNTO-A-OTRO-SISTEMA.md). |
+| **Instalar al lado de Windows** | Igual, junto a Windows; el menú de T-Rex Bites lista Windows. Ver [la guía](docs/INSTALAR-JUNTO-A-OTRO-SISTEMA.md). |
 
 Pasos para un computador dedicado:
 
@@ -100,7 +101,7 @@ Para tenerlo como app en el teléfono, en el navegador usa
 | 📤 **Subir** | Subir videos a un canal y categoría (con barra de progreso) |
 | 📚 **Programas** | Ver y borrar los videos de cada canal |
 | 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y **grilla semanal** de cada canal: eliges un pincel (categoría, fin de transmisión o apagado) y tocas las horas |
-| ☰ **Más** | **WiFi**, crear y editar **canales** y sus categorías, **qué se vio** cada día, PIN y opciones avanzadas |
+| ☰ **Más** | **WiFi**, **canales** (categorías, **comerciales** y **logo**), **actualizaciones**, **qué se vio** cada día, PIN y opciones avanzadas |
 
 ---
 

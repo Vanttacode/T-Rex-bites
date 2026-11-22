@@ -231,3 +231,9 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .wifi-net .bars { font-family: monospace; color: var(--accent-2); letter-spacing: -2px; }
 .wifi-net.current .ssid { color: var(--accent); font-weight: bold; }
 #wifi-other { margin-top: 6px; }
+
+/* channel logo */
+.logo-row { display: flex; align-items: center; gap: 14px; margin: 8px 0 12px; }
+.logo-row img { width: 96px; height: 72px; object-fit: contain; background: #000; border-radius: 10px; padding: 6px; }
+.logo-actions { display: flex; flex-direction: column; gap: 8px; }
+#ch-ads-opts { margin-left: 4px; }

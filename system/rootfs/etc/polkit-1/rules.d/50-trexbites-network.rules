@@ -1,7 +1,18 @@
-// T-Rex Bites: the panel runs as the "tv" user and sets up WiFi from the
-// phone (list networks, save the home network, open the setup network).
+// T-Rex Bites: the panel runs as the "tv" user.
 polkit.addRule(function (action, subject) {
-    if (subject.user == "tv" && action.id.indexOf("org.freedesktop.NetworkManager.") == 0) {
+    if (subject.user != "tv") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    // set up WiFi from the phone (list networks, save the home network,
+    // open the setup network)
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0) {
         return polkit.Result.YES;
     }
+    // "Actualizar" in the panel: start the updater, nothing else
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "trexbites-update.service" &&
+        action.lookup("verb") == "start") {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
 });

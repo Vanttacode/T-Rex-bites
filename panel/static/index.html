@@ -170,6 +170,41 @@
             <button class="btn small ghost" id="ch-cat-add">Agregar</button>
           </div>
         </div>
+        <div class="field" id="ch-ads-field" hidden>
+          <label class="switch"><input type="checkbox" id="ch-ads-on"> 📺 Pasar comerciales</label>
+          <div id="ch-ads-opts">
+            <label class="field">Cuándo
+              <select id="ch-ads-strategy">
+                <option value="end">Al final de cada programa</option>
+                <option value="standard">Repartidos durante el programa</option>
+                <option value="center">Una tanda a la mitad del programa</option>
+              </select>
+            </label>
+            <label class="field">Duración de cada tanda
+              <select id="ch-ads-duration">
+                <option value="30">30 segundos</option>
+                <option value="60">1 minuto</option>
+                <option value="120">2 minutos</option>
+                <option value="180">3 minutos</option>
+                <option value="300">5 minutos</option>
+              </select>
+            </label>
+            <p class="muted small">Los comerciales se suben en <b>Subir</b>, eligiendo la categoría "📺 Comerciales".</p>
+          </div>
+        </div>
+        <div class="field" id="ch-logo-field" hidden>
+          Logo del canal (esquina de la pantalla)
+          <div class="logo-row">
+            <img id="ch-logo-img" alt="Logo del canal">
+            <div class="logo-actions">
+              <label class="btn small ghost">Cambiar logo<input type="file" id="ch-logo-file" accept="image/png,image/jpeg,image/gif" hidden></label>
+              <button class="btn small ghost" id="ch-logo-reset" type="button">Usar logo T-Rex</button>
+            </div>
+          </div>
+          <label class="switch"><input type="checkbox" id="ch-logo-show"> Mostrar logo en pantalla</label>
+          <label class="switch"><input type="checkbox" id="ch-logo-permanent"> Siempre visible (si no, aparece unos segundos)</label>
+        </div>
+        <p class="muted small" id="ch-new-note" hidden>Después de crear el canal podrás ponerle logo y comerciales.</p>
         <div class="btn-row">
           <button class="btn" id="ch-save">Guardar canal</button>
           <button class="btn ghost" id="ch-cancel">Cancelar</button>
@@ -182,6 +217,16 @@
         <h2>📊 Qué se vio</h2>
         <p class="muted small">Lo que pasó la tele cada día (minutos en pantalla).</p>
         <div id="history"></div>
+      </div>
+
+      <div class="card" id="update-card">
+        <h2>🔄 Actualizaciones</h2>
+        <p class="power-line" id="upd-status">…</p>
+        <div class="btn-row">
+          <button class="btn small ghost" id="upd-check">Buscar actualización</button>
+          <button class="btn" id="upd-apply" hidden>Actualizar</button>
+        </div>
+        <p class="error" id="upd-error" role="alert"></p>
       </div>
 
       <div class="card" id="pin-card">
@@ -215,5 +260,6 @@
   <script src="/static/app.js"></script>
   <script src="/static/manage.js"></script>
   <script src="/static/wifi.js"></script>
+  <script src="/static/updates.js"></script>
 </body>
 </html>

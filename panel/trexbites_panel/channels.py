@@ -27,7 +27,21 @@ TAG_LABELS = {
 # short clips FieldStation42 plays to fill the gaps between programs; scheduled
 # channels need at least one (T-Rex Bites puts its own ident there)
 BUMP_DIR = "bumps"
-RESERVED_TAGS = {SIGNOFF, BUMP_DIR}
+# commercials of a scheduled channel; shown in the panel as one more folder
+COMMERCIAL_DIR = "comerciales"
+COMMERCIAL_TAG = "_comerciales"
+# the channel's own logo (FieldStation42's OSD looks in content_dir/logos)
+LOGO_DIR = "logos"
+LOGO_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif")
+RESERVED_TAGS = {SIGNOFF, BUMP_DIR, COMMERCIAL_DIR, LOGO_DIR}
+
+# when commercial breaks happen (FieldStation42's break_strategy)
+BREAK_STRATEGIES = {
+    "end": "Al final de cada programa",
+    "standard": "Repartidos durante el programa",
+    "center": "Una tanda a la mitad del programa",
+}
+MIN_BREAK, MAX_BREAK = 15, 600
 
 # runtime files that FieldStation42's installer puts in place
 RUNTIME_MEDIA = {
@@ -52,6 +66,8 @@ def slugify(text):
 def tag_label(tag):
     if tag is None:
         return "Todos los videos"
+    if tag == COMMERCIAL_TAG:
+        return "📺 Comerciales"
     return TAG_LABELS.get(tag, tag.replace("_", " ").capitalize())
 
 
@@ -151,9 +167,50 @@ def station_folders(conf, fs42_dir):
     if not base.is_absolute():
         base = Path(fs42_dir) / base
     tags = [tag for tag, _ in channel_categories(conf)]
-    if not tags:
-        return [(None, base)]
-    return [(tag, base / tag) for tag in tags]
+    folders = [(tag, base / tag) for tag in tags] if tags else [(None, base)]
+    if ads_enabled(conf):
+        folders.append((COMMERCIAL_TAG, base / conf["commercial_dir"]))
+    return folders
+
+
+def ads_enabled(conf):
+    return (conf.get("network_type", "standard") == "standard"
+            and not conf.get("commercial_free", False)
+            and isinstance(conf.get("commercial_dir"), str) and bool(conf.get("commercial_dir")))
+
+
+def ads_settings(conf):
+    return {
+        "enabled": ads_enabled(conf),
+        "strategy": conf.get("break_strategy", "end") if conf.get("break_strategy") in BREAK_STRATEGIES else "end",
+        "duration": int(conf.get("break_duration", 120) or 120),
+    }
+
+
+def _content_base(conf, fs42_dir):
+    base = Path(conf.get("content_dir") or "")
+    return base if base.is_absolute() else Path(fs42_dir) / base
+
+
+def logo_folder(conf, fs42_dir):
+    return _content_base(conf, fs42_dir) / LOGO_DIR
+
+
+def logo_file(conf, fs42_dir):
+    """The channel's uploaded logo, or None (then the T-Rex Bites logo is used)."""
+    name = conf.get("default_logo")
+    if conf.get("logo_dir") != LOGO_DIR or not isinstance(name, str) or not name:
+        return None
+    path = logo_folder(conf, fs42_dir) / name
+    return path if path.is_file() else None
+
+
+def logo_settings(conf, fs42_dir):
+    return {
+        "show": bool(conf.get("show_logo", True)),
+        "permanent": bool(conf.get("logo_permanent", True)),
+        "custom": logo_file(conf, fs42_dir) is not None,
+    }
 
 
 def week_grid(conf):
@@ -190,6 +247,8 @@ def channel_summaries(confs_dir, fs42_dir):
             "type": ntype,
             "categories": [{"tag": t, "label": l} for t, l in channel_categories(conf)],
             "schedule": week_grid(conf) if ntype == "standard" else None,
+            "ads": ads_settings(conf) if ntype == "standard" else None,
+            "logo": logo_settings(conf, fs42_dir),
             "folders": [
                 {"tag": tag, "label": labels.get(tag, tag_label(tag)), "path": str(path)}
                 for tag, path in folders
@@ -278,6 +337,8 @@ def new_station_conf(stations, long_name, number, network_type, category_labels=
             "commercial_free": True,
             "fallback_tag": categories[0]["tag"],
             "bump_dir": BUMP_DIR,
+            "break_strategy": "end",
+            "break_duration": 120,
             **RUNTIME_MEDIA,
             **default_week(categories[0]["tag"]),
             "trexbites": {"categories": categories},
@@ -312,7 +373,50 @@ def _remember_categories(conf):
         ]
 
 
-def update_station_conf(conf, stations, long_name, number, categories=None):
+def set_ads(conf, ads):
+    """ads = {"enabled": bool, "strategy": "end"|"standard"|"center", "duration": seconds}"""
+    if not isinstance(ads, dict):
+        raise ChannelError("Configuración de comerciales inválida.")
+    if conf.get("network_type", "standard") != "standard":
+        raise ChannelError("Los comerciales solo existen en canales con horario.")
+    if not ads.get("enabled"):
+        conf["commercial_free"] = True
+        return
+    strategy = ads.get("strategy", "end")
+    if strategy not in BREAK_STRATEGIES:
+        raise ChannelError("Elige cuándo van los comerciales.")
+    try:
+        duration = int(ads.get("duration", 120))
+    except (TypeError, ValueError):
+        raise ChannelError("La duración de la tanda debe ser un número de segundos.")
+    if not MIN_BREAK <= duration <= MAX_BREAK:
+        raise ChannelError("La tanda de comerciales debe durar entre 15 segundos y 10 minutos.")
+    conf.update({
+        "commercial_free": False,
+        "commercial_dir": COMMERCIAL_DIR,
+        "break_strategy": strategy,
+        "break_duration": duration,
+    })
+
+
+def set_logo(conf, logo, filename=None):
+    """logo = {"show": bool, "permanent": bool}; filename: name of an uploaded
+    logo in content_dir/logos, or "" to go back to the T-Rex Bites logo."""
+    if logo is not None:
+        if not isinstance(logo, dict):
+            raise ChannelError("Configuración de logo inválida.")
+        conf["show_logo"] = bool(logo.get("show", True))
+        conf["logo_permanent"] = bool(logo.get("permanent", True))
+    if filename is not None:
+        if filename:
+            conf["logo_dir"] = LOGO_DIR
+            conf["default_logo"] = filename
+        else:
+            conf.pop("default_logo", None)
+            conf.pop("logo_dir", None)
+
+
+def update_station_conf(conf, stations, long_name, number, categories=None, ads=None, logo=None):
     conf = copy.deepcopy(conf)
     conf["network_long_name"] = clean_label(long_name, "El nombre del canal")
     conf["channel_number"] = _clean_number(number, stations, own_name=conf["network_name"])
@@ -330,6 +434,10 @@ def update_station_conf(conf, stations, long_name, number, categories=None):
         conf.setdefault("trexbites", {})["categories"] = categories
         if conf.get("fallback_tag") not in keep:
             conf["fallback_tag"] = categories[0]["tag"]
+    if ads is not None:
+        set_ads(conf, ads)
+    if logo is not None:
+        set_logo(conf, logo)
     return conf
 
 

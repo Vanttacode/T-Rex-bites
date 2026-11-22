@@ -3,15 +3,7 @@
 Sirve para un computador que ya tiene Linux (o Windows) y que quieres **seguir
 usando**. T-Rex Bites se instala en el **espacio libre sin particionar** del
 disco y no toca las particiones que ya existen. Al prender el computador aparece
-un menú para elegir:
-
-```
-  Debian GNU/Linux            ← T-Rex Bites (la tele)
-  Opciones avanzadas
-  Mi Linux (en /dev/sda1)     ← tu sistema de siempre
-```
-
-El menú espera 8 segundos y, si no eliges nada, arranca T-Rex Bites.
+un menú para elegir entre T-Rex Bites y tu sistema de siempre.
 
 > ⚠️ **Antes de empezar, haz una copia de seguridad de tus archivos importantes.**
 > El instalador no toca tus particiones, pero cambiar particiones de un disco
@@ -58,19 +50,46 @@ Una partición en uso no se puede achicar, así que se hace desde un USB "vivo":
 
 ## 3. Instalar
 
-1. Graba `trexbites.iso` en un USB y arranca desde él.
-2. Elige **"Instalar al lado de otro sistema (usa el espacio libre)"**.
-3. Baja a **"Sí, instalar T-Rex Bites en el espacio libre"** y Enter.
-4. Espera de 15 a 30 minutos. Se reinicia solo.
+> **Arranca el USB en el mismo modo que tu sistema.** Si tu Linux no tiene
+> partición EFI (como un Fedora con una partición de 1 MiB al inicio), arranca el
+> USB en modo **Legacy/BIOS**. Si tiene partición EFI (`/boot/efi`), en modo **UEFI**.
+> En el menú de arranque del computador (F12, F9, Esc…) el USB suele aparecer dos
+> veces: la entrada con "UEFI" es el modo UEFI y la otra es Legacy.
 
-Si el disco **no tiene espacio sin asignar**, el instalador se detiene y te
-muestra un mensaje en vez de borrar algo: apaga el computador y haz el paso 2.
+### Al lado de otro Linux (Fedora, Ubuntu, Mint…)
+
+1. Graba `trexbites.iso` en un USB y arranca desde él.
+2. Elige **"Instalar al lado de otro Linux"** → **"Sí, instalar T-Rex Bites en el espacio libre"**.
+3. Espera de 15 a 30 minutos. Al terminar se reinicia y **arranca tu Linux como siempre**
+   (el instalador no toca su menú de arranque, para no arriesgar tu sistema).
+4. En tu Linux, abre una terminal y ejecuta:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/Vanttacode/T-Rex-bites/main/system/agregar-al-menu.sh | sudo bash
+   ```
+
+   Busca la partición de T-Rex Bites y la agrega al menú de arranque de tu Linux.
+   Para que **T-Rex Bites arranque por defecto** (útil si el computador queda al lado de la tele):
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/Vanttacode/T-Rex-bites/main/system/agregar-al-menu.sh | sudo bash -s -- --por-defecto
+   ```
+
+5. Reinicia: verás el menú 10 segundos con **"T-Rex Bites"** y tu Linux.
+
+Para quitarlo del menú: el mismo comando con `--quitar`.
+
+### Al lado de Windows
+
+1. Arranca desde el USB y elige **"Instalar al lado de Windows"** → **"Sí"**.
+2. Al reiniciar aparece el menú de T-Rex Bites con Windows en la lista
+   (espera 8 segundos y, si no eliges nada, arranca T-Rex Bites).
 
 ## Notas
 
 - Si el computador tiene **más de un disco**, el instalador puede preguntarte
   cuál usar.
-- El menú de arranque lo instala T-Rex Bites. Si alguna vez actualizas tu otro
-  Linux y el menú cambia, los dos sistemas siguen ahí.
-- Para que el computador arranque directo en tu otro sistema por defecto, se
-  puede cambiar después (pide ayuda; es un cambio de una línea).
+- Al lado de otro Linux, el menú es el de **tu** Linux: sus actualizaciones no
+  borran la entrada de T-Rex Bites, y las de T-Rex Bites tampoco la rompen
+  (apunta a `/vmlinuz`, que siempre es su kernel actual).
+- Al lado de Windows, el menú es el de T-Rex Bites.

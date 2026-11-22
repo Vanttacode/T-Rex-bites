@@ -2,10 +2,12 @@
 
 import asyncio
 import datetime as dt
+import json
 import logging
 import os
 import re
 import shutil
+import subprocess
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -17,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import bedtime, channels
+from . import bedtime, channels, updates
 from .fs42 import FS42Client, FS42Error
 from .history import History
 from .state import PanelState
@@ -31,6 +33,12 @@ STATE_PATH = Path(os.environ.get("TREXBITES_STATE", "/var/lib/trexbites/panel.js
 HISTORY_PATH = Path(os.environ.get("TREXBITES_HISTORY", "/var/lib/trexbites/history.db"))
 PLACEHOLDER = Path(os.environ.get("TREXBITES_PLACEHOLDER", "/opt/trexbites/media/_bienvenida_trexbites.mp4"))
 IDENT = Path(os.environ.get("TREXBITES_IDENT", "/opt/trexbites/media/_ident_trexbites.mp4"))
+VERSION_FILE = Path(os.environ.get("TREXBITES_VERSION_FILE", "/opt/trexbites/VERSION"))
+UPDATE_STATE = Path(os.environ.get("TREXBITES_UPDATE_STATE", "/var/lib/trexbites/update.json"))
+TREX_CONF = Path(os.environ.get("TREXBITES_CONF", "/opt/trexbites/trexbites.conf"))
+# "systemd" starts trexbites-update.service; "none" disables it (development, tests)
+UPDATE_BACKEND = os.environ.get("TREXBITES_UPDATE", "systemd")
+MAX_LOGO_BYTES = 5 * 1024 * 1024
 # "systemd" switches the screen for bedtime; "none" only computes it (development, tests)
 POWER_BACKEND = os.environ.get("TREXBITES_POWER", "systemd")
 # "nmcli" manages WiFi through NetworkManager; "none" disables it (development, tests)
@@ -123,6 +131,7 @@ app.state.fs42 = FS42Client(FS42_URL, FS42_DIR)
 app.state.history = History(HISTORY_PATH)
 app.state.tv_power = bedtime.TVPower()
 app.state.wifi = WifiManager()
+app.state.updates = updates.UpdateChecker()
 app.state.power = {"state": "on", "reason": None, "until": None}
 _login_failures = defaultdict(deque)
 
@@ -213,24 +222,31 @@ def list_videos(folder):
                 "name": path.name,
                 "size": st.st_size,
                 "modified": int(st.st_mtime),
-                # the sample clip T-Rex Bites puts in empty folders
-                "placeholder": path.name == PLACEHOLDER_NAME,
+                # the sample clips T-Rex Bites puts in empty folders
+                "placeholder": path.name in SAMPLE_NAMES,
             })
     return videos
 
 
 def fill_if_empty(folder):
-    """FieldStation42 needs at least one video per category: empty folders get the sample clip."""
+    """FieldStation42 needs at least one video per category: empty folders get
+    a sample clip (the short "Ya volvemos" ident for commercial folders)."""
     folder.mkdir(parents=True, exist_ok=True)
-    if not list_videos(folder) and PLACEHOLDER.is_file():
+    if list_videos(folder):
+        return
+    if folder.name == channels.COMMERCIAL_DIR and IDENT.is_file():
+        shutil.copyfile(IDENT, folder / IDENT_NAME)
+    elif PLACEHOLDER.is_file():
         shutil.copyfile(PLACEHOLDER, folder / PLACEHOLDER_NAME)
 
 
 def remove_placeholder(folder):
-    (folder / PLACEHOLDER_NAME).unlink(missing_ok=True)
+    for name in SAMPLE_NAMES:
+        (folder / name).unlink(missing_ok=True)
 
 
 IDENT_NAME = "_ident_trexbites.mp4"
+SAMPLE_NAMES = {PLACEHOLDER_NAME, IDENT_NAME}
 
 
 def ensure_folders(conf):
@@ -370,7 +386,7 @@ async def get_channels():
                 "videos": list_videos(Path(folder["path"])),
             })
         result.append({**{k: channel[k] for k in ("name", "long_name", "number", "type",
-                                                  "categories", "schedule")},
+                                                  "categories", "schedule", "ads", "logo")},
                        "folders": folders})
     return {"channels": result}
 
@@ -448,6 +464,10 @@ class EditChannelBody(BaseModel):
     number: int
     # existing categories as {"tag", "label"}, new ones as plain labels
     categories: list[str | dict[str, str]] | None = None
+    # {"enabled": bool, "strategy": "end"|"standard"|"center", "duration": seconds}
+    ads: dict | None = None
+    # {"show": bool, "permanent": bool}
+    logo: dict | None = None
 
 
 class ScheduleBody(BaseModel):
@@ -487,14 +507,15 @@ async def edit_channel(name: str, body: EditChannelBody, request: Request):
     try:
         old = channels.find_station(_confs_dir(), name)
         conf = channels.update_station_conf(old, channels.load_stations(_confs_dir()), body.long_name,
-                                            body.number, body.categories)
+                                            body.number, body.categories, body.ads, body.logo)
     except channels.ChannelError as e:
         raise _channel_error(e)
     await _save_on_tv(fs42_client(request).update_station(name, conf))
     ensure_folders(conf)
-    # the player only reads channel names and numbers when it starts
-    restart = (old.get("channel_number") != conf["channel_number"]
-               or old.get("network_long_name") != conf.get("network_long_name"))
+    # the player and the on-screen logo only read channel settings when they start
+    watched = ("channel_number", "network_long_name", "commercial_free", "break_strategy",
+               "break_duration", "show_logo", "logo_permanent")
+    restart = any(old.get(key) != conf.get(key) for key in watched)
     fs42_client(request).schedule_rebuild(name, restart=restart)
     return {"ok": True}
 
@@ -623,3 +644,105 @@ async def connect_wifi(body: WifiConnectBody, request: Request):
 
         asyncio.get_running_loop().create_task(later())
     return {"ok": True, "ssid": ssid}
+
+
+# ---------------------------------------------------------------------------
+# channel logo
+
+def _logo_conf(name):
+    try:
+        return channels.find_station(_confs_dir(), name)
+    except channels.ChannelError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/channels/{name}/logo", dependencies=[Depends(require_session)])
+async def get_logo(name: str):
+    path = channels.logo_file(_logo_conf(name), FS42_DIR)
+    if path is None:
+        path = STATIC_DIR / "icon-512.png"  # the T-Rex Bites logo shown by default
+    return FileResponse(path, headers={"Cache-Control": "no-cache"})
+
+
+@app.post("/api/channels/{name}/logo", dependencies=[Depends(require_session)])
+async def upload_logo(name: str, request: Request, file: UploadFile = File(...)):
+    conf = _logo_conf(name)
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in channels.LOGO_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="El logo debe ser una imagen PNG, JPG o GIF.")
+    data = await file.read(MAX_LOGO_BYTES + 1)
+    await file.close()
+    if len(data) > MAX_LOGO_BYTES:
+        raise HTTPException(status_code=400, detail="La imagen es muy pesada (máximo 5 MB).")
+    folder = channels.logo_folder(conf, FS42_DIR)
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob("logo.*"):
+        old.unlink()
+    filename = f"logo{suffix}"
+    (folder / filename).write_bytes(data)
+    channels.set_logo(conf, None, filename)
+    await _save_on_tv(fs42_client(request).update_station(name, conf))
+    fs42_client(request).schedule_restart()
+    return {"ok": True}
+
+
+@app.delete("/api/channels/{name}/logo", dependencies=[Depends(require_session)])
+async def delete_logo(name: str, request: Request):
+    conf = _logo_conf(name)
+    for old in channels.logo_folder(conf, FS42_DIR).glob("logo.*"):
+        old.unlink()
+    channels.set_logo(conf, None, "")
+    await _save_on_tv(fs42_client(request).update_station(name, conf))
+    fs42_client(request).schedule_restart()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# updates
+
+def _current_version():
+    try:
+        return VERSION_FILE.read_text().strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
+
+
+def _update_state():
+    try:
+        return json.loads(UPDATE_STATE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+@app.get("/api/update", dependencies=[Depends(require_session)])
+async def get_update(request: Request, check: bool = False):
+    checker = request.app.state.updates
+    if check:
+        await checker.refresh(updates.repo_from_conf(TREX_CONF))
+    current = _current_version()
+    latest = checker.latest
+    return {
+        "current": current,
+        "latest": latest,
+        "available": bool(latest and updates.is_newer(latest["tag"], current)),
+        "checked_at": checker.checked_at,
+        "error": checker.error,
+        "state": _update_state(),
+    }
+
+
+@app.post("/api/update", dependencies=[Depends(require_session)])
+async def start_update(request: Request):
+    checker = request.app.state.updates
+    await checker.refresh(updates.repo_from_conf(TREX_CONF))
+    if not (checker.latest and updates.is_newer(checker.latest["tag"], _current_version())):
+        raise HTTPException(status_code=409, detail="Ya tienes la última versión.")
+    if _update_state().get("status") == "running":
+        raise HTTPException(status_code=409, detail="Ya se está actualizando.")
+    if UPDATE_BACKEND == "systemd":
+        result = await asyncio.to_thread(
+            subprocess.run, ["systemctl", "start", "--no-block", "trexbites-update.service"],
+            capture_output=True, text=True, timeout=20)
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail="No se pudo iniciar la actualización.")
+    return {"ok": True, "version": checker.latest["tag"]}

@@ -1,0 +1,28 @@
+[
+    {
+        "type": "StatusDisplay",
+        "halign": "LEFT",
+        "valign": "TOP",
+        "display_time": 3.0,
+        "font_size": 48,
+        "text_color": [255, 138, 31, 230],
+        "format_text": "{channel_number}  {network_name}"
+    },
+    {
+        "type": "LogoDisplay",
+        "halign": "RIGHT",
+        "valign": "BOTTOM",
+        "width": 0.14,
+        "height": 0.18,
+        "x_margin": 0.04,
+        "y_margin": 0.05,
+        "display_time": 8.0,
+        "default_logo": "/opt/trexbites/media/logo_trexbites.png",
+        "default_logo_alpha": 0.85,
+        "default_show_logo": true,
+        "default_logo_permanent": true
+    },
+    {
+        "type": "VolumeDisplay"
+    }
+]

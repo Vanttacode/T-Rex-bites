@@ -33,6 +33,10 @@ polkitd
 wireless-regdb
 # boot menu: finds a Linux or Windows already on the disk
 os-prober
+# security updates on their own, and a compositor so the channel logo is
+# drawn transparently over the video
+unattended-upgrades
+picom
 avahi-daemon
 libnss-mdns
 mesa-va-drivers

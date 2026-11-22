@@ -99,7 +99,7 @@ fi
 STAGE="$WORK/stage"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/trexbites/payload/panel"
-cp -r "$REPO/upstream" "$REPO/system" "$STAGE/trexbites/payload/"
+cp -r "$REPO/upstream" "$REPO/system" "$REPO/VERSION" "$STAGE/trexbites/payload/"
 cp -r "$REPO/panel/trexbites_panel" "$REPO/panel/static" "$REPO/panel/requirements.txt" "$STAGE/trexbites/payload/panel/"
 find "$STAGE" -name '__pycache__' -prune -exec rm -rf {} +
 if [ "$OFFLINE" = 1 ]; then
@@ -176,6 +176,13 @@ d-i partman/confirm_nooverwrite boolean true
 d-i partman-efi/non_efi_system boolean true"
 GRUB_FREE="d-i grub-installer/only_debian boolean false
 d-i grub-installer/with_other_os boolean true"
+# next to another Linux: no boot loader at all, so the other Linux's boot menu
+# (and the system itself) stay exactly as they were. That Linux then adds
+# T-Rex Bites to its own menu with system/agregar-al-menu.sh. Installing GRUB
+# over a Fedora (btrfs subvolumes, BLS entries) could leave Fedora unbootable.
+GRUB_NONE="d-i grub-installer/skip boolean true
+d-i lilo-installer/skip boolean true
+d-i nobootloader/confirmation_common note"
 
 kernel_args() {
     echo "auto=true priority=critical preseed/file=/cdrom/trexbites/$1 locale=$LOCALE keyboard-configuration/xkb-keymap=$KEYMAP vga=788 --- quiet"
@@ -192,14 +199,17 @@ fill() {
         | sed -e "s|@LOCALE@|$LOCALE|g" -e "s|@KEYMAP@|$KEYMAP|g" -e "s|@TIMEZONE@|$TIMEZONE|g" \
               -e "s|@TV_PASSWORD@|$TV_PASSWORD|g" \
               -e "s|@KERNEL_ARGS@|$(kernel_args preseed.cfg)|g" \
-              -e "s|@KERNEL_ARGS_LIBRE@|$(kernel_args preseed-libre.cfg)|g" > "$dst"
+              -e "s|@KERNEL_ARGS_LIBRE@|$(kernel_args preseed-libre.cfg)|g" \
+              -e "s|@KERNEL_ARGS_LINUX@|$(kernel_args preseed-linux.cfg)|g" > "$dst"
 }
 
 fill "$ISO_DIR/preseed.cfg.in" "$STAGE/trexbites/preseed.cfg" "$DISK_WHOLE" "$GRUB_WHOLE"
 fill "$ISO_DIR/preseed.cfg.in" "$STAGE/trexbites/preseed-libre.cfg" "$DISK_FREE" "$GRUB_FREE"
+fill "$ISO_DIR/preseed.cfg.in" "$STAGE/trexbites/preseed-linux.cfg" "$DISK_FREE" "$GRUB_NONE"
 fill "$ISO_DIR/isolinux.cfg.in" "$STAGE/isolinux.cfg"
 fill "$ISO_DIR/trexbites-confirm.cfg.in" "$STAGE/trexbites-confirm.cfg"
 fill "$ISO_DIR/trexbites-confirm-libre.cfg.in" "$STAGE/trexbites-confirm-libre.cfg"
+fill "$ISO_DIR/trexbites-confirm-linux.cfg.in" "$STAGE/trexbites-confirm-linux.cfg"
 fill "$ISO_DIR/trexbites-style.cfg.in" "$STAGE/trexbites-style.cfg"
 fill "$ISO_DIR/grub.cfg.in" "$STAGE/grub.cfg"
 
@@ -214,6 +224,7 @@ xorriso -indev "$BASE_ISO" -outdev "$OUT_ISO" \
     -map "$STAGE/isolinux.cfg" /isolinux/isolinux.cfg \
     -map "$STAGE/trexbites-confirm.cfg" /isolinux/trexbites-confirm.cfg \
     -map "$STAGE/trexbites-confirm-libre.cfg" /isolinux/trexbites-confirm-libre.cfg \
+    -map "$STAGE/trexbites-confirm-linux.cfg" /isolinux/trexbites-confirm-linux.cfg \
     -map "$STAGE/trexbites-style.cfg" /isolinux/trexbites-style.cfg \
     -map "$STAGE/grub.cfg" /boot/grub/grub.cfg \
     -boot_image any replay

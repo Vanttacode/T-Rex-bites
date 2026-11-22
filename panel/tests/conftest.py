@@ -55,6 +55,10 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("TREXBITES_PLACEHOLDER", str(placeholder))
     monkeypatch.setenv("TREXBITES_POWER", "none")
     monkeypatch.setenv("TREXBITES_WIFI", "none")
+    monkeypatch.setenv("TREXBITES_UPDATE", "none")
+    (tmp_path / "VERSION").write_text("0.2.0-beta")
+    monkeypatch.setenv("TREXBITES_VERSION_FILE", str(tmp_path / "VERSION"))
+    monkeypatch.setenv("TREXBITES_UPDATE_STATE", str(tmp_path / "state" / "update.json"))
     monkeypatch.setenv("TREXBITES_FS42_URL", "http://127.0.0.1:9")
 
     from trexbites_panel import app as app_module

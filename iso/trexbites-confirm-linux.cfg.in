@@ -1,0 +1,20 @@
+# Installing next to another Linux: only the free (unpartitioned) space is used
+# and the other Linux keeps its own boot menu; afterwards a command run in that
+# Linux adds T-Rex Bites to its menu (system/agregar-al-menu.sh)
+path
+include trexbites-style.cfg
+default vesamenu.c32
+prompt 0
+timeout 0
+menu title Solo el espacio libre; tu Linux no se toca
+
+label no
+    menu label ^No, volver
+    menu default
+    kernel vesamenu.c32
+    append isolinux.cfg
+
+label yes
+    menu label ^Si, instalar T-Rex Bites en el espacio libre
+    kernel /install.amd/vmlinuz
+    append initrd=/install.amd/initrd.gz @KERNEL_ARGS_LINUX@

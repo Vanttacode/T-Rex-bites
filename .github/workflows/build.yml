@@ -39,7 +39,7 @@ jobs:
       - name: Revisar scripts
         run: |
           sudo apt-get update -q && sudo apt-get install -y -q shellcheck
-          shellcheck -x -e SC1091 system/install-trexbites.sh iso/build-iso.sh iso/build-offline-payload.sh
+          shellcheck -x -e SC1091 system/install-trexbites.sh system/trexbites-update.sh system/agregar-al-menu.sh iso/build-iso.sh iso/build-offline-payload.sh
 
   iso:
     name: USB de instalación (sin internet)
@@ -91,6 +91,23 @@ jobs:
             echo "publish=$publish"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Paquete de actualización
+        if: steps.name.outputs.publish == 'true'
+        env:
+          VERSION_TAG: ${{ steps.name.outputs.version }}
+        run: |
+          # what "Actualizar" in the panel downloads: program files only,
+          # installed online (videos and settings on the TV are kept)
+          stage=$(mktemp -d)
+          cp -r upstream system "$stage/"
+          mkdir -p "$stage/panel"
+          cp -r panel/trexbites_panel panel/static panel/requirements.txt "$stage/panel/"
+          echo "${VERSION_TAG#v}" > "$stage/VERSION"
+          find "$stage" -name __pycache__ -prune -exec rm -rf {} +
+          bundle="trexbites-update-${VERSION_TAG}.tar.gz"
+          tar -czf "iso/out/$bundle" -C "$stage" .
+          (cd iso/out && sha256sum "$bundle" > "$bundle.sha256")
+
       - name: Guardar como artefacto
         uses: actions/upload-artifact@v4
         with:
@@ -113,6 +130,8 @@ jobs:
           files: |
             iso/out/${{ steps.name.outputs.file }}
             iso/out/${{ steps.name.outputs.file }}.sha256
+            iso/out/trexbites-update-${{ steps.name.outputs.version }}.tar.gz
+            iso/out/trexbites-update-${{ steps.name.outputs.version }}.tar.gz.sha256
           body: |
             ## 🦖📺 T-Rex Bites ${{ steps.name.outputs.version }}
 
@@ -120,7 +139,13 @@ jobs:
             [balenaEtcher](https://etcher.balena.io/).
 
             - Se instala **sin internet**: el USB trae todo.
-            - ⚠️ La instalación **borra todo el disco** del computador.
+            - En el menú del USB eliges cómo instalar:
+              - **Instalar T-Rex Bites**: ⚠️ borra todo el disco (computador dedicado a la tele).
+              - **Instalar al lado de otro Linux** (Fedora, Ubuntu…): usa solo el espacio sin asignar;
+                después agrega T-Rex Bites al menú de tu Linux con `system/agregar-al-menu.sh`.
+              - **Instalar al lado de Windows**: usa solo el espacio sin asignar.
+            - ¿Ya tienes T-Rex Bites? Actualiza desde el panel: **Más → Actualizaciones**
+              (`trexbites-update-*.tar.gz` es ese paquete; no hace falta descargarlo).
             - Guía completa en el [README](https://github.com/${{ github.repository }}#readme).
 
             Para verificar la descarga: `sha256sum -c ${{ steps.name.outputs.file }}.sha256`

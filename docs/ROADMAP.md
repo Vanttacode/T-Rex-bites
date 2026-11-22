@@ -21,7 +21,8 @@
 
 ## 🎨 Fase 3: look de los 2000
 
-- [ ] Logo T-Rex Bites en la esquina (mosca de canal).
+- [x] Logo en la esquina (mosca de canal), propio por canal, y número de canal al cambiar.
+- [x] Comerciales propios por canal: al final, repartidos o a la mitad del programa.
 - [ ] Cortinillas y "bumpers" propios entre programas.
 - [ ] Estática y sonido al cambiar de canal.
 - [ ] Guía de programación con estilo cable de los 2000.
@@ -33,7 +34,7 @@
 - [x] Hora de dormir: apagado automático con pantalla "¡A dormir!", "Apagar hasta mañana" y "1 hora extra".
 - [x] Crear, renombrar, renumerar y borrar canales, con sus categorías.
 - [x] Historial: qué pasó la tele cada día y cuántos minutos.
-- [ ] Botón "Actualizar T-Rex Bites" en el panel.
+- [x] Botón "Actualizar T-Rex Bites" en el panel (desde GitHub Releases) y actualizaciones de seguridad automáticas.
 - [ ] Límite diario de minutos (necesita un botón de encendido: control remoto físico).
 - [ ] Ver el canal en vivo desde el navegador (otra tele de la casa).
 - [ ] Imagen para Raspberry Pi.

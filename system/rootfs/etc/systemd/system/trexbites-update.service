@@ -1,0 +1,11 @@
+# Installs the newest T-Rex Bites from GitHub Releases. Started from the
+# panel ("Actualizar"); videos, channels and settings are kept.
+[Unit]
+Description=T-Rex Bites - actualización
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/trexbites/bin/trexbites-update apply
+TimeoutStartSec=3600
