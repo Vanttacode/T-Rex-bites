@@ -28,6 +28,7 @@ FS42_URL = os.environ.get("TREXBITES_FS42_URL", "http://127.0.0.1:4242")
 STATE_PATH = Path(os.environ.get("TREXBITES_STATE", "/var/lib/trexbites/panel.json"))
 HISTORY_PATH = Path(os.environ.get("TREXBITES_HISTORY", "/var/lib/trexbites/history.db"))
 PLACEHOLDER = Path(os.environ.get("TREXBITES_PLACEHOLDER", "/opt/trexbites/media/_bienvenida_trexbites.mp4"))
+IDENT = Path(os.environ.get("TREXBITES_IDENT", "/opt/trexbites/media/_ident_trexbites.mp4"))
 # "systemd" switches the screen for bedtime; "none" only computes it (development, tests)
 POWER_BACKEND = os.environ.get("TREXBITES_POWER", "systemd")
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -202,9 +203,17 @@ def remove_placeholder(folder):
     (folder / PLACEHOLDER_NAME).unlink(missing_ok=True)
 
 
+IDENT_NAME = "_ident_trexbites.mp4"
+
+
 def ensure_folders(conf):
     for _, folder in channels.station_folders(conf, FS42_DIR):
         fill_if_empty(folder)
+    bumps = channels.bump_folder(conf, FS42_DIR)
+    if bumps:
+        bumps.mkdir(parents=True, exist_ok=True)
+        if not list_videos(bumps) and IDENT.is_file():
+            shutil.copyfile(IDENT, bumps / IDENT_NAME)
 
 
 def media_root():

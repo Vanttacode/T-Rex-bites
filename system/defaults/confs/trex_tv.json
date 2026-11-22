@@ -7,6 +7,7 @@
     "schedule_increment": 30,
     "commercial_free": true,
     "fallback_tag": "dibujos",
+    "bump_dir": "bumps",
     "content_dir": "catalog/trex_tv",
     "sign_off_video": "runtime/signoff.mp4",
     "off_air_video": "runtime/off_air_pattern.mp4",

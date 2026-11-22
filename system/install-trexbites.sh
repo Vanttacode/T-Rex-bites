@@ -192,7 +192,19 @@ if [ ! -f "$MEDIA_ASSETS/a_dormir.png" ]; then
         -vf "drawtext=fontfile=$FONT:text='zzz...':fontsize=72:fontcolor=0xa9abc9:x=(w-tw)/2:y=h/2-190,drawtext=fontfile=$FONT:text='¡A dormir!':fontsize=120:fontcolor=0xff8a1f:borderw=6:x=(w-tw)/2:y=h/2-90,drawtext=fontfile=$FONT:text='T-Rex TV vuelve mañana':fontsize=48:fontcolor=white:x=(w-tw)/2:y=h/2+80" \
         "$MEDIA_ASSETS/a_dormir.png"
 fi
-chmod 644 "$PLACEHOLDER" "$MEDIA_ASSETS/a_dormir.png"
+IDENT=$MEDIA_ASSETS/_ident_trexbites.mp4
+if [ ! -f "$IDENT" ]; then
+    # short station ident that fills the gaps between programs
+    ffmpeg -hide_banner -loglevel error -y \
+        -f lavfi -i "color=c=0x12142b:size=1280x720:rate=25" \
+        -f lavfi -i "sine=frequency=660:sample_rate=48000" \
+        -t 10 \
+        -vf "drawtext=fontfile=$FONT:text='T-REX TV':fontsize=140:fontcolor=0xff8a1f:borderw=8:x=(w-tw)/2:y=h/2-110,drawtext=fontfile=$FONT:text='Ya volvemos...':fontsize=56:fontcolor=white:x=(w-tw)/2:y=h/2+70" \
+        -af "volume=0.03" \
+        -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -shortest \
+        "$IDENT"
+fi
+chmod 644 "$PLACEHOLDER" "$MEDIA_ASSETS/a_dormir.png" "$IDENT"
 
 # FieldStation42 needs at least one video per category: empty folders get the sample clip
 while IFS= read -r folder; do
@@ -202,6 +214,15 @@ while IFS= read -r folder; do
         as_tv cp "$PLACEHOLDER" "$folder/_bienvenida_trexbites.mp4"
     fi
 done < <(python3 -I "$SRC_DIR/panel/trexbites_panel/channels.py" --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-dirs)
+
+# scheduled channels fill the gaps between programs with short clips
+while IFS= read -r folder; do
+    [ -n "$folder" ] || continue
+    as_tv mkdir -p "$folder"
+    if [ -z "$(find "$folder" -maxdepth 1 -type f -print -quit)" ]; then
+        as_tv cp "$IDENT" "$folder/_ident_trexbites.mp4"
+    fi
+done < <(python3 -I "$SRC_DIR/panel/trexbites_panel/channels.py" --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-bump-dirs)
 
 step "Preparando la programación inicial"
 as_tv bash -c "cd '$FS42_DIR' && env/bin/python3 station_42.py --rebuild_catalog && env/bin/python3 station_42.py --add_week" \

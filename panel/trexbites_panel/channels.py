@@ -24,6 +24,11 @@ TAG_LABELS = {
     "peliculas": "Películas",
 }
 
+# short clips FieldStation42 plays to fill the gaps between programs; scheduled
+# channels need at least one (T-Rex Bites puts its own ident there)
+BUMP_DIR = "bumps"
+RESERVED_TAGS = {SIGNOFF, BUMP_DIR}
+
 # runtime files that FieldStation42's installer puts in place
 RUNTIME_MEDIA = {
     "sign_off_video": "runtime/signoff.mp4",
@@ -223,7 +228,7 @@ def _clean_categories(items, existing=()):
             label = item.get("label") if isinstance(item, dict) else item
             label = clean_label(label, "El nombre de la categoría")
             tag = slugify(label)
-        if tag == SIGNOFF:
+        if tag in RESERVED_TAGS:
             raise ChannelError("Ese nombre de categoría está reservado.")
         if tag in seen:
             raise ChannelError(f"La categoría \"{label}\" está repetida.")
@@ -272,11 +277,31 @@ def new_station_conf(stations, long_name, number, network_type, category_labels=
             "schedule_increment": 30,
             "commercial_free": True,
             "fallback_tag": categories[0]["tag"],
+            "bump_dir": BUMP_DIR,
             **RUNTIME_MEDIA,
             **default_week(categories[0]["tag"]),
             "trexbites": {"categories": categories},
         })
     return conf
+
+
+def bump_folder(conf, fs42_dir):
+    """Folder with the gap-filling clips of a scheduled channel, or None."""
+    if conf.get("network_type", "standard") != "standard" or not conf.get("content_dir"):
+        return None
+    bump = conf.get("bump_dir")
+    if not isinstance(bump, str) or not bump:
+        return None
+    base = Path(conf["content_dir"])
+    if not base.is_absolute():
+        base = Path(fs42_dir) / base
+    return base / bump if not Path(bump).is_absolute() else Path(bump)
+
+
+def _repair(conf):
+    """Older scheduled channels may lack a bump folder, which FieldStation42 needs."""
+    if conf.get("network_type", "standard") == "standard" and not conf.get("bump_dir"):
+        conf["bump_dir"] = BUMP_DIR
 
 
 def _remember_categories(conf):
@@ -292,6 +317,7 @@ def update_station_conf(conf, stations, long_name, number, categories=None):
     conf["network_long_name"] = clean_label(long_name, "El nombre del canal")
     conf["channel_number"] = _clean_number(number, stations, own_name=conf["network_name"])
     _remember_categories(conf)
+    _repair(conf)
     if conf.get("network_type", "standard") == "standard" and categories is not None:
         categories = _clean_categories(categories, [t for t, _ in channel_categories(conf)])
         keep = {c["tag"] for c in categories}
@@ -316,6 +342,7 @@ def set_week(conf, week):
     valid = {tag for tag, _ in channel_categories(conf)}
     conf = copy.deepcopy(conf)
     _remember_categories(conf)
+    _repair(conf)
     for day in DAYS:
         slots = week.get(day) or {}
         if not isinstance(slots, dict):
@@ -339,7 +366,14 @@ def main():
     parser.add_argument("--confs", required=True, help="FieldStation42 confs folder")
     parser.add_argument("--fs42", required=True, help="FieldStation42 folder")
     parser.add_argument("--print-dirs", action="store_true", help="print one media folder per line")
+    parser.add_argument("--print-bump-dirs", action="store_true", help="print one bump folder per line")
     args = parser.parse_args()
+    if args.print_bump_dirs:
+        for conf in load_stations(args.confs):
+            folder = bump_folder(conf, args.fs42)
+            if folder:
+                print(folder)
+        return
     for channel in channel_summaries(args.confs, args.fs42):
         for folder in channel["folders"]:
             print(folder["path"])

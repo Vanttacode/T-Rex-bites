@@ -89,6 +89,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          # tags like v0.1.0-beta are published as test versions
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             iso/out/${{ steps.name.outputs.file }}
             iso/out/${{ steps.name.outputs.file }}.sha256

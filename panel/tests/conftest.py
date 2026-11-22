@@ -46,6 +46,9 @@ def env(tmp_path, monkeypatch):
     placeholder = tmp_path / "media" / "_bienvenida_trexbites.mp4"
     placeholder.parent.mkdir()
     placeholder.write_bytes(b"sample")
+    ident = tmp_path / "media" / "_ident_trexbites.mp4"
+    ident.write_bytes(b"ident")
+    monkeypatch.setenv("TREXBITES_IDENT", str(ident))
     monkeypatch.setenv("TREXBITES_FS42_DIR", str(fs42))
     monkeypatch.setenv("TREXBITES_STATE", str(tmp_path / "state" / "panel.json"))
     monkeypatch.setenv("TREXBITES_HISTORY", str(tmp_path / "state" / "history.db"))

@@ -208,3 +208,28 @@ def test_history_endpoint(env):
     assert days[0]["total_minutes"] == 3
     assert days[0]["programs"][0] == {"channel": 3, "network": "TRexTV", "title": "Dinos",
                                       "minutes": 3, "channel_name": "T-Rex TV"}
+
+
+def test_scheduled_channels_get_a_bump_folder(env):
+    """FieldStation42 fills gaps between programs from bump_dir; without it schedules fail."""
+    c = env["client"]
+    login(c)
+    c.post("/api/channels", json={"long_name": "Cuentos", "number": 9, "categories": ["Cuentos"]})
+    conf = json.loads((env["fs42"] / "confs" / "Cuentos.json").read_text())["station_conf"]
+    assert conf["bump_dir"] == "bumps"
+    assert (env["fs42"] / "catalog" / "cuentos" / "bumps" / "_ident_trexbites.mp4").exists()
+    # the bump folder is not a category people upload to
+    assert [f["tag"] for f in channels_by_name(c)["Cuentos"]["folders"]] == ["cuentos"]
+    assert c.post("/api/channels", json={"long_name": "X", "number": 10, "categories": ["Bumps"]}).status_code == 400
+
+
+def test_old_channel_without_bump_dir_is_repaired_on_save(env):
+    c = env["client"]
+    login(c)
+    path = env["fs42"] / "confs" / "trex_tv.json"
+    data = json.loads(path.read_text())
+    del data["station_conf"]["bump_dir"]
+    path.write_text(json.dumps(data))
+    c.put("/api/channels/TRexTV", json={"long_name": "T-Rex TV", "number": 3})
+    assert json.loads(path.read_text())["station_conf"]["bump_dir"] == "bumps"
+    assert (env["fs42"] / "catalog" / "trex_tv" / "bumps" / "_ident_trexbites.mp4").exists()
