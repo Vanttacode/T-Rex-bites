@@ -1,0 +1,30 @@
+# Debian packages T-Rex Bites needs on the TV machine (one per line).
+# The offline USB bundles these and all their dependencies.
+ca-certificates
+git
+sudo
+curl
+python3
+python3-venv
+python3-pip
+mpv
+ffmpeg
+fonts-dejavu-core
+xserver-xorg-core
+xserver-xorg-video-all
+xserver-xorg-input-all
+xinit
+x11-xserver-utils
+libxcb-cursor0
+libgl1
+libegl1
+libxkbcommon-x11-0
+dbus-user-session
+pipewire
+pipewire-pulse
+wireplumber
+network-manager
+avahi-daemon
+libnss-mdns
+mesa-va-drivers
+mesa-vdpau-drivers

@@ -5,6 +5,11 @@
 # by hand on an existing minimal Debian:   sudo ./system/install-trexbites.sh
 #
 # It is safe to run again: it never overwrites channels, videos or the PIN.
+#
+# Two modes:
+#   offline  the USB built by iso/build-iso.sh carries every package, Python
+#            library and FieldStation42 itself in ../offline: no internet needed
+#   online   anything else (for example a git clone): downloads what it needs
 set -euo pipefail
 
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,6 +25,8 @@ MEDIA_DIR=/srv/trexbites
 STATE_DIR=/var/lib/trexbites
 LOG=/var/log/trexbites-install.log
 HOSTNAME_TV=trexbites
+OFFLINE_DIR=$SRC_DIR/offline
+OFFLINE_LIST=/etc/apt/sources.list.d/trexbites-offline.list
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Este instalador necesita ejecutarse como administrador (sudo)." >&2
@@ -38,37 +45,57 @@ fi
 
 as_tv() { runuser -u "$TV_USER" -- "$@"; }
 step() { echo; echo ">>> $*"; }
+read_list() { grep -v -E '^\s*(#|$)' "$SRC_DIR/system/$1"; }
+
+if [ -d "$OFFLINE_DIR/repo" ] && [ -d "$OFFLINE_DIR/wheels" ]; then
+    OFFLINE=1
+    echo "Modo sin internet: todo se instala desde el USB."
+else
+    OFFLINE=0
+    echo "Modo con internet: se descarga lo necesario."
+fi
 
 # ---------------------------------------------------------------------------
-step "Activando repositorios de firmware (drivers de WiFi y video)"
-if [ -f /etc/apt/sources.list ]; then
-    sed -i -E '/^deb(-src)? .*debian/ { / non-free-firmware/! s/$/ non-free-firmware/ }' /etc/apt/sources.list
-fi
-for f in /etc/apt/sources.list.d/*.sources; do
-    [ -f "$f" ] || continue
-    sed -i -E '/^Components:/ { / non-free-firmware/! s/$/ non-free-firmware/ }' "$f"
-done
-
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
+mapfile -t PACKAGES < <(read_list packages.txt)
+mapfile -t OPTIONAL_PACKAGES < <(read_list packages-optional.txt)
+
+if [ "$OFFLINE" = 1 ]; then
+    step "Usando los paquetes incluidos en el USB"
+    chmod -R a+rX "$OFFLINE_DIR"
+    echo "deb [trusted=yes] file:$OFFLINE_DIR/repo ./" > "$OFFLINE_LIST"
+    # only the USB's packages: the network may not exist yet
+    APT=(apt-get -o "Dir::Etc::SourceList=$OFFLINE_LIST" -o "Dir::Etc::SourceParts=-")
+    "${APT[@]}" update
+
+    # where future updates come from, once the TV has internet
+    if ! grep -qsE '^deb ' /etc/apt/sources.list && ! ls /etc/apt/sources.list.d/*.sources >/dev/null 2>&1; then
+        cat > /etc/apt/sources.list <<'SOURCES'
+deb http://deb.debian.org/debian trixie main non-free-firmware
+deb http://deb.debian.org/debian trixie-updates main non-free-firmware
+deb http://security.debian.org/debian-security trixie-security main non-free-firmware
+SOURCES
+    fi
+else
+    step "Activando repositorios de firmware (drivers de WiFi y video)"
+    if [ -f /etc/apt/sources.list ]; then
+        sed -i -E '/^deb(-src)? .*debian/ { / non-free-firmware/! s/$/ non-free-firmware/ }' /etc/apt/sources.list
+    fi
+    for f in /etc/apt/sources.list.d/*.sources; do
+        [ -f "$f" ] || continue
+        sed -i -E '/^Components:/ { / non-free-firmware/! s/$/ non-free-firmware/ }' "$f"
+    done
+    APT=(apt-get)
+    "${APT[@]}" update
+    mapfile -t -O "${#PACKAGES[@]}" PACKAGES < <(read_list packages-build.txt)
+fi
 
 step "Instalando paquetes del sistema"
-apt-get install -y --no-install-recommends \
-    ca-certificates git sudo curl \
-    python3 python3-venv python3-pip python3-dev build-essential \
-    mpv ffmpeg fonts-dejavu-core \
-    xserver-xorg-core xserver-xorg-video-all xserver-xorg-input-all xinit x11-xserver-utils \
-    libxcb-cursor0 libgl1 libegl1 libxkbcommon-x11-0 \
-    dbus-user-session pipewire pipewire-pulse wireplumber \
-    network-manager avahi-daemon libnss-mdns \
-    mesa-va-drivers mesa-vdpau-drivers
+"${APT[@]}" install -y --no-install-recommends "${PACKAGES[@]}"
 
-# hardware support: install whatever exists in this Debian release, skip the rest
-for pkg in firmware-linux-free firmware-misc-nonfree firmware-realtek firmware-iwlwifi \
-           firmware-atheros firmware-brcm80211 firmware-libertas firmware-amd-graphics \
-           firmware-intel-graphics firmware-intel-sound firmware-sof-signed \
-           intel-media-va-driver i965-va-driver; do
-    apt-get install -y --no-install-recommends "$pkg" || echo "(aviso) no se pudo instalar $pkg, sigo"
+# hardware support: install whatever exists, skip the rest
+for pkg in "${OPTIONAL_PACKAGES[@]}"; do
+    "${APT[@]}" install -y --no-install-recommends "$pkg" || echo "(aviso) no se pudo instalar $pkg, sigo"
 done
 
 # ---------------------------------------------------------------------------
@@ -84,12 +111,19 @@ mkdir -p "$PREFIX" "$MEDIA_DIR/catalog" "$MEDIA_DIR/.uploads" "$STATE_DIR"
 chown "$TV_USER:$TV_USER" "$PREFIX" "$MEDIA_DIR" "$MEDIA_DIR/catalog" "$MEDIA_DIR/.uploads" "$STATE_DIR"
 
 # ---------------------------------------------------------------------------
-step "Descargando FieldStation42 (motor de la tele) en la versión $FS42_COMMIT"
-if [ ! -d "$FS42_DIR/.git" ]; then
-    as_tv git clone "$FS42_REPO" "$FS42_DIR"
+if [ "$OFFLINE" = 1 ]; then
+    step "Copiando FieldStation42 (motor de la tele) desde el USB"
+    as_tv mkdir -p "$FS42_DIR"
+    # an update never touches confs/ or runtime/: those hold the person's settings
+    as_tv tar -xzf "$OFFLINE_DIR/fieldstation42.tar.gz" -C "$FS42_DIR" --exclude=./confs --exclude=./runtime
+else
+    step "Descargando FieldStation42 (motor de la tele) en la versión $FS42_COMMIT"
+    if [ ! -d "$FS42_DIR/.git" ]; then
+        as_tv git clone "$FS42_REPO" "$FS42_DIR"
+    fi
+    as_tv git -C "$FS42_DIR" fetch --quiet origin
+    as_tv git -C "$FS42_DIR" -c advice.detachedHead=false checkout --quiet "$FS42_COMMIT"
 fi
-as_tv git -C "$FS42_DIR" fetch --quiet origin
-as_tv git -C "$FS42_DIR" -c advice.detachedHead=false checkout --quiet "$FS42_COMMIT"
 
 # videos live on /srv so the engine can be reinstalled without touching them
 if [ ! -e "$FS42_DIR/catalog" ]; then
@@ -123,7 +157,14 @@ fi
 
 step "Instalando FieldStation42 (esto puede tardar varios minutos)"
 # its installer asks to press Enter; with no keyboard input it just continues
-as_tv bash -c "cd '$FS42_DIR' && TERM=dumb bash install.sh </dev/null"
+if [ "$OFFLINE" = 1 ]; then
+    # FieldStation42's own installer downloads its Python libraries one by one:
+    # these pip settings make it take them from the USB instead
+    as_tv env PIP_NO_INDEX=1 PIP_FIND_LINKS="$OFFLINE_DIR/wheels" \
+        bash -c "cd '$FS42_DIR' && TERM=dumb bash install.sh </dev/null"
+else
+    as_tv bash -c "cd '$FS42_DIR' && TERM=dumb bash install.sh </dev/null"
+fi
 if [ ! -x "$FS42_DIR/env/bin/python3" ]; then
     echo "ERROR: FieldStation42 no quedó instalado (falta env/bin/python3)." >&2
     exit 1
@@ -172,8 +213,13 @@ mkdir -p "$PANEL_DIR"
 cp -r "$SRC_DIR/panel/trexbites_panel" "$SRC_DIR/panel/static" "$SRC_DIR/panel/requirements.txt" "$PANEL_DIR/"
 chown -R "$TV_USER:$TV_USER" "$PANEL_DIR"
 as_tv python3 -m venv "$PANEL_DIR/env"
-as_tv "$PANEL_DIR/env/bin/pip" install --quiet --upgrade pip
-as_tv "$PANEL_DIR/env/bin/pip" install --quiet -r "$PANEL_DIR/requirements.txt"
+if [ "$OFFLINE" = 1 ]; then
+    as_tv "$PANEL_DIR/env/bin/pip" install --quiet --no-index --find-links "$OFFLINE_DIR/wheels" \
+        -r "$PANEL_DIR/requirements.txt"
+else
+    as_tv "$PANEL_DIR/env/bin/pip" install --quiet --upgrade pip
+    as_tv "$PANEL_DIR/env/bin/pip" install --quiet -r "$PANEL_DIR/requirements.txt"
+fi
 
 # ---------------------------------------------------------------------------
 step "Configurando el arranque directo a la tele"
@@ -215,7 +261,46 @@ systemctl enable avahi-daemon.service NetworkManager.service trexbites-panel.ser
 systemctl enable trexbites-firstboot.service
 systemctl set-default multi-user.target
 
+# home WiFi given when the USB was built (only for USBs made at home)
+if [ -f "$SRC_DIR/wifi.conf" ]; then
+    step "Guardando la red WiFi de la casa"
+    # shellcheck source=/dev/null
+    . "$SRC_DIR/wifi.conf"
+    install -d -m 700 /etc/NetworkManager/system-connections
+    NM_FILE=/etc/NetworkManager/system-connections/trexbites-casa.nmconnection
+    (
+        umask 077
+        cat > "$NM_FILE" <<WIFI
+[connection]
+id=Casa
+type=wifi
+autoconnect=true
+
+[wifi]
+mode=infrastructure
+ssid=$WIFI_SSID
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk=$WIFI_PASSWORD
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+WIFI
+    )
+    chmod 600 "$NM_FILE"
+fi
+
 touch "$STATE_DIR/installed"
+
+if [ "$OFFLINE" = 1 ]; then
+    # the USB copy is no longer needed: frees about 1 GB for videos
+    rm -f "$OFFLINE_LIST"
+    rm -rf "$OFFLINE_DIR"
+fi
 echo
 echo "=== T-Rex Bites quedó instalado $(date) ==="
 echo "Reinicia el equipo. Luego abre http://$HOSTNAME_TV.local desde tu teléfono (PIN 1234)."

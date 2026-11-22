@@ -20,39 +20,56 @@ tele los va pasando sola, como un canal de verdad: prendes y ya hay algo dando.
 
 ## Instalar en un computador
 
-### 1. Crear el USB (una sola vez)
+### 1. Descargar el USB (una sola vez)
 
-En un computador con Linux (o WSL en Windows):
+1. Entra a la sección **[Releases](../../releases)** del repositorio y descarga
+   `trexbites-vX.Y.Z.iso` (unos 1,6 GB).
+2. Grábalo en un USB **de 4 GB o más** con [balenaEtcher](https://etcher.balena.io/)
+   (Windows, Mac o Linux).
+
+El USB **trae todo**: Debian, los drivers, FieldStation42, el panel y las librerías.
+**El computador no necesita internet para instalarse.**
+
+<details>
+<summary>Crear el USB uno mismo (avanzado)</summary>
+
+En Linux con Docker (o WSL en Windows), con internet y unos 4 GB libres:
 
 ```bash
-sudo apt install xorriso curl
+sudo apt install xorriso curl docker.io
 ./iso/build-iso.sh
 ```
 
-Queda el archivo `iso/out/trexbites.iso`. Grábalo en un USB (de 2 GB o más) con
-[balenaEtcher](https://etcher.balena.io/).
-
-Opciones útiles al crear el USB:
+Queda `iso/out/trexbites.iso`. Opciones:
 
 ```bash
-# WiFi de la casa (para instalar sin cable de red)
+# Guardar el WiFi de la casa en la tele (¡no publiques un USB con tu clave!)
 TREX_WIFI_SSID="MiWifi" TREX_WIFI_PASSWORD="clave" ./iso/build-iso.sh
 
 # Otro país o teclado (por defecto: Chile y teclado latinoamericano)
 TREX_LOCALE=es_AR.UTF-8 TREX_TIMEZONE=America/Argentina/Buenos_Aires ./iso/build-iso.sh
 TREX_LOCALE=es_ES.UTF-8 TREX_KEYMAP=es TREX_TIMEZONE=Europe/Madrid ./iso/build-iso.sh
+
+# USB pequeño (~800 MB) que descarga todo durante la instalación
+TREX_OFFLINE=0 ./iso/build-iso.sh
 ```
+
+Publicar una versión nueva: crear una etiqueta `vX.Y.Z` (`git tag v0.2.0 && git push --tags`).
+GitHub Actions arma el USB y lo publica en Releases automáticamente.
+</details>
 
 ### 2. Instalar
 
 > ⚠️ **La instalación borra todo el disco del computador.**
 
-1. Conecta el USB y el cable de red (o usa un USB creado con tu WiFi).
+1. Conecta el USB. No hace falta internet ni cable de red.
 2. Prende el computador y elige arrancar desde el USB. Según la marca, hay que
    presionar **F12**, **F9**, **F2**, **Esc** o **Novo** (Lenovo) al encenderlo.
 3. Elige **Instalar T-Rex Bites** y luego **Sí, borrar el disco e instalar**.
-4. Espera de 15 a 40 minutos, según el equipo y la velocidad de internet. El
-   computador se reinicia solo y aparece la tele.
+4. Espera unos 15 a 30 minutos. El computador se reinicia solo y aparece la tele.
+5. Para usar el panel desde el teléfono, la tele debe estar en la red de la casa:
+   conecta un **cable de red** al router. *(Configurar el WiFi desde el teléfono
+   llega en la próxima versión.)*
 
 ### 3. Usar
 

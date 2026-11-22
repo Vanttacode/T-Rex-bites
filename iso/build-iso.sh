@@ -3,16 +3,24 @@
 # automatic install of T-Rex Bites. Write it to a USB stick (balenaEtcher,
 # Raspberry Pi Imager, or dd) and boot any 64-bit PC from it.
 #
-# Needs: bash, curl, xorriso, sha256sum   (Debian/Ubuntu: sudo apt install xorriso curl)
+# By default the USB carries everything (Debian packages, Python libraries and
+# FieldStation42), so the computer needs NO internet to install. Building it
+# needs Docker, internet and about 4 GB of free disk.
+#
+# Needs: bash, curl, xorriso, sha256sum, docker
+#        (Debian/Ubuntu: sudo apt install xorriso curl docker.io)
 #
 # Optional settings (environment variables):
+#   TREX_OFFLINE=1               0 = small USB that downloads everything while installing
 #   TREX_LOCALE=es_CL.UTF-8      language and country of the installed system
 #   TREX_KEYMAP=latam            keyboard layout (es = Spain, latam = Latin America, us)
 #   TREX_TIMEZONE=America/Santiago
 #   TREX_TV_PASSWORD=trexbites   password of the "tv" maintenance account
 #   TREX_WIFI_SSID / TREX_WIFI_PASSWORD
-#                                home WiFi, so the install works without a cable
+#                                home WiFi, saved on the TV (never put these in a public build)
 #   DEBIAN_ISO=/path/to/debian-13.x-amd64-netinst.iso   use an already downloaded image
+#   OFFLINE_PAYLOAD=/path        use an offline bundle built before (see build-offline-payload.sh)
+#   EXTRA_CA_CERT=/path/ca.crt   extra HTTPS certificate for networks that inspect traffic
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -21,6 +29,7 @@ WORK="$ISO_DIR/build"
 OUT="$ISO_DIR/out"
 DEBIAN_CD_URL="${DEBIAN_CD_URL:-https://cdimage.debian.org/debian-cd/current/amd64/iso-cd}"
 
+OFFLINE="${TREX_OFFLINE:-1}"
 LOCALE="${TREX_LOCALE:-es_CL.UTF-8}"
 KEYMAP="${TREX_KEYMAP:-latam}"
 TIMEZONE="${TREX_TIMEZONE:-America/Santiago}"
@@ -28,8 +37,20 @@ TV_PASSWORD="${TREX_TV_PASSWORD:-trexbites}"
 WIFI_SSID="${TREX_WIFI_SSID:-}"
 WIFI_PASSWORD="${TREX_WIFI_PASSWORD:-}"
 
-for cmd in curl xorriso sha256sum; do
-    command -v "$cmd" >/dev/null || { echo "Falta '$cmd'. Instálalo (ej: sudo apt install xorriso curl)." >&2; exit 1; }
+NEEDED=(curl xorriso sha256sum)
+if [ "$OFFLINE" = 1 ] && [ -z "${OFFLINE_PAYLOAD:-}" ]; then
+    NEEDED+=(docker)
+fi
+for cmd in "${NEEDED[@]}"; do
+    command -v "$cmd" >/dev/null || { echo "Falta '$cmd'. Instálalo (ej: sudo apt install xorriso curl docker.io)." >&2; exit 1; }
+done
+
+# values are written into shell and preseed files: refuse characters that would break them
+for value in "$LOCALE" "$KEYMAP" "$TIMEZONE" "$TV_PASSWORD" "$WIFI_SSID" "$WIFI_PASSWORD"; do
+    if printf '%s' "$value" | grep -q '[@|\\"'"'"'$`]'; then
+        echo "Los valores de configuración no pueden contener @ | \\ \" ' \$ o \`" >&2
+        exit 1
+    fi
 done
 
 mkdir -p "$WORK" "$OUT"
@@ -54,34 +75,87 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. T-Rex Bites files that go on the USB stick
+# 2. Offline bundle: every package and library, built inside Debian 13
+if [ "$OFFLINE" = 1 ]; then
+    if [ -n "${OFFLINE_PAYLOAD:-}" ]; then
+        PAYLOAD_DIR="$OFFLINE_PAYLOAD"
+    else
+        PAYLOAD_DIR="$WORK/offline"
+        mkdir -p "$PAYLOAD_DIR"
+        echo ">>> Armando el paquete sin internet (10-20 minutos la primera vez)"
+        DOCKER_ARGS=(--rm -v "$REPO:/src:ro" -v "$PAYLOAD_DIR:/out")
+        if [ -n "${EXTRA_CA_CERT:-}" ]; then
+            DOCKER_ARGS+=(-v "$EXTRA_CA_CERT:/extra-ca.crt:ro")
+        fi
+        docker run "${DOCKER_ARGS[@]}" debian:trixie /src/iso/build-offline-payload.sh /src /out
+    fi
+    for item in repo/Packages.gz wheels fieldstation42.tar.gz; do
+        [ -e "$PAYLOAD_DIR/$item" ] || { echo "El paquete sin internet está incompleto: falta $item" >&2; exit 1; }
+    done
+fi
+
+# ---------------------------------------------------------------------------
+# 3. T-Rex Bites files that go on the USB stick
 STAGE="$WORK/stage"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/trexbites/payload/panel"
 cp -r "$REPO/upstream" "$REPO/system" "$STAGE/trexbites/payload/"
 cp -r "$REPO/panel/trexbites_panel" "$REPO/panel/static" "$REPO/panel/requirements.txt" "$STAGE/trexbites/payload/panel/"
 find "$STAGE" -name '__pycache__' -prune -exec rm -rf {} +
+if [ "$OFFLINE" = 1 ]; then
+    mkdir -p "$STAGE/trexbites/payload/offline"
+    cp -r "$PAYLOAD_DIR/repo" "$PAYLOAD_DIR/wheels" "$PAYLOAD_DIR/fieldstation42.tar.gz" \
+        "$STAGE/trexbites/payload/offline/"
+    [ -f "$PAYLOAD_DIR/FIELDSTATION42-LICENSE.txt" ] && cp "$PAYLOAD_DIR/FIELDSTATION42-LICENSE.txt" "$STAGE/trexbites/"
+fi
+cp "$REPO/NOTICE.md" "$STAGE/trexbites/"
 
-# values are written into a shell/preseed file: refuse characters that would break it
-for value in "$LOCALE" "$KEYMAP" "$TIMEZONE" "$TV_PASSWORD" "$WIFI_SSID" "$WIFI_PASSWORD"; do
-    if printf '%s' "$value" | grep -q '[@|\\"'"'"'$`]'; then
-        echo "Los valores de configuración no pueden contener @ | \\ \" ' \$ o \`" >&2
-        exit 1
+if [ "$OFFLINE" = 1 ]; then
+    # the Debian installer never touches the network: everything comes from the USB
+    NETWORK_LINES="d-i netcfg/enable boolean false
+d-i netcfg/get_hostname string trexbites
+d-i netcfg/get_domain string
+d-i netcfg/hostname string trexbites
+d-i hw-detect/load_firmware boolean true
+d-i clock-setup/ntp boolean false
+d-i apt-setup/use_mirror boolean false
+d-i apt-setup/no_mirror boolean true
+d-i apt-setup/services-select multiselect"
+    PACKAGE_LINES="d-i pkgsel/upgrade select none
+d-i pkgsel/update-policy select none"
+    if [ -n "$WIFI_SSID" ]; then
+        # saved on the installed system, where NetworkManager uses it
+        printf "WIFI_SSID='%s'\nWIFI_PASSWORD='%s'\n" "$WIFI_SSID" "$WIFI_PASSWORD" > "$STAGE/trexbites/payload/wifi.conf"
     fi
-done
-
-WIFI_LINES="# no WiFi configured at build time"
-if [ -n "$WIFI_SSID" ]; then
-    WIFI_LINES="d-i netcfg/wireless_essid string $WIFI_SSID
+else
+    NETWORK_LINES="d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string trexbites
+d-i netcfg/get_domain string
+d-i netcfg/hostname string trexbites
+d-i hw-detect/load_firmware boolean true
+d-i clock-setup/ntp boolean true
+d-i mirror/country string manual
+d-i mirror/http/hostname string deb.debian.org
+d-i mirror/http/directory string /debian
+d-i mirror/http/proxy string"
+    if [ -n "$WIFI_SSID" ]; then
+        NETWORK_LINES="$NETWORK_LINES
+d-i netcfg/wireless_essid string $WIFI_SSID
 d-i netcfg/wireless_essid_again string $WIFI_SSID
 d-i netcfg/wireless_security_type select wpa
 d-i netcfg/wireless_wpa string $WIFI_PASSWORD"
+    fi
+    PACKAGE_LINES="d-i pkgsel/include string sudo ca-certificates git
+d-i pkgsel/upgrade select full-upgrade"
 fi
 
 fill() {
     local src="$1" dst="$2"
     local kernel_args="auto=true priority=critical preseed/file=/cdrom/trexbites/preseed.cfg locale=$LOCALE keyboard-configuration/xkb-keymap=$KEYMAP vga=788 --- quiet"
-    awk -v wifi="$WIFI_LINES" '{ if ($0 == "@WIFI_LINES@") print wifi; else print }' "$src" \
+    awk -v net="$NETWORK_LINES" -v pkg="$PACKAGE_LINES" '
+        $0 == "@NETWORK_LINES@" { print net; next }
+        $0 == "@PACKAGE_LINES@" { print pkg; next }
+        { print }' "$src" \
         | sed -e "s|@LOCALE@|$LOCALE|g" -e "s|@KEYMAP@|$KEYMAP|g" -e "s|@TIMEZONE@|$TIMEZONE|g" \
               -e "s|@TV_PASSWORD@|$TV_PASSWORD|g" -e "s|@KERNEL_ARGS@|$kernel_args|g" > "$dst"
 }
@@ -93,7 +167,7 @@ fill "$ISO_DIR/trexbites-style.cfg.in" "$STAGE/trexbites-style.cfg"
 fill "$ISO_DIR/grub.cfg.in" "$STAGE/grub.cfg"
 
 # ---------------------------------------------------------------------------
-# 3. New image: same boot setup as Debian's (BIOS + UEFI, USB-bootable),
+# 4. New image: same boot setup as Debian's (BIOS + UEFI, USB-bootable),
 #    with our files and boot menus added
 OUT_ISO="$OUT/trexbites.iso"
 rm -f "$OUT_ISO"
@@ -108,5 +182,5 @@ xorriso -indev "$BASE_ISO" -outdev "$OUT_ISO" \
 
 (cd "$OUT" && sha256sum trexbites.iso > trexbites.iso.sha256)
 echo
-echo "Listo: $OUT_ISO"
+echo "Listo: $OUT_ISO ($(du -h "$OUT_ISO" | cut -f1))"
 echo "Grábalo en un USB con balenaEtcher (o: sudo dd if=$OUT_ISO of=/dev/sdX bs=4M status=progress)"

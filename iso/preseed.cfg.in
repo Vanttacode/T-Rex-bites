@@ -5,19 +5,8 @@
 d-i debian-installer/locale string @LOCALE@
 d-i keyboard-configuration/xkb-keymap select @KEYMAP@
 
-# Network (cable is detected automatically; WiFi only if set at build time)
-d-i netcfg/choose_interface select auto
-d-i netcfg/get_hostname string trexbites
-d-i netcfg/get_domain string
-d-i netcfg/hostname string trexbites
-d-i hw-detect/load_firmware boolean true
-@WIFI_LINES@
-
-# Debian mirror
-d-i mirror/country string manual
-d-i mirror/http/hostname string deb.debian.org
-d-i mirror/http/directory string /debian
-d-i mirror/http/proxy string
+# Network and Debian mirror (filled in by build-iso.sh: none for the offline USB)
+@NETWORK_LINES@
 
 # Accounts: no root password; "tv" can use sudo for maintenance
 d-i passwd/root-login boolean false
@@ -30,7 +19,6 @@ d-i user-setup/allow-password-weak boolean true
 # Clock
 d-i clock-setup/utc boolean true
 d-i time/zone string @TIMEZONE@
-d-i clock-setup/ntp boolean true
 
 # Disk: use the whole first disk, no questions.
 # The boot menu already asked the person to confirm erasing it.
@@ -46,16 +34,15 @@ d-i partman/confirm boolean true
 d-i partman/confirm_nooverwrite boolean true
 d-i partman-efi/non_efi_system boolean true
 
-# Packages: minimal system plus firmware for WiFi/video chips
+# Packages: minimal system; T-Rex Bites adds the rest from the USB or the internet
 d-i apt-setup/non-free-firmware boolean true
 d-i apt-setup/non-free boolean false
 d-i apt-setup/contrib boolean false
 d-i apt-setup/cdrom/set-first boolean false
 d-i apt-setup/disable-cdrom-entries boolean true
 tasksel tasksel/first multiselect
-d-i pkgsel/include string sudo ca-certificates git
-d-i pkgsel/upgrade select full-upgrade
 popularity-contest popularity-contest/participate boolean false
+@PACKAGE_LINES@
 
 # Boot loader
 d-i grub-installer/only_debian boolean true

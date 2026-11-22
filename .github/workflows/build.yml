@@ -1,0 +1,105 @@
+name: Pruebas y USB de instalación
+
+# - On every push and pull request: run the panel tests and lint the scripts.
+# - On a version tag (v1.0.0, v1.1.0, ...): also build the offline USB image and
+#   publish it as a GitHub Release, ready to download and write with balenaEtcher.
+# - "Run workflow" button (Actions tab): build the image as a downloadable
+#   artifact without publishing a release.
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Pruebas del panel
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Instalar dependencias
+        run: pip install -r panel/requirements.txt -r panel/requirements-dev.txt
+
+      - name: Pruebas
+        working-directory: panel
+        run: python -m pytest -q
+
+      - name: Revisar scripts
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q shellcheck
+          shellcheck -x -e SC1091 system/install-trexbites.sh iso/build-iso.sh iso/build-offline-payload.sh
+
+  iso:
+    name: USB de instalación (sin internet)
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Herramientas
+        run: sudo apt-get update -q && sudo apt-get install -y -q xorriso
+
+      - name: Construir trexbites.iso
+        run: ./iso/build-iso.sh
+
+      - name: Nombre con versión
+        id: name
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="dev-${GITHUB_SHA::7}"
+          fi
+          file="trexbites-${version}.iso"
+          mv iso/out/trexbites.iso "iso/out/$file"
+          (cd iso/out && sha256sum "$file" > "$file.sha256")
+          size=$(stat -c %s "iso/out/$file")
+          echo "Tamaño: $((size / 1024 / 1024)) MB"
+          # GitHub Releases accepts files up to 2 GiB
+          if [ "$size" -ge 2147483648 ]; then
+            echo "::error::La imagen pesa más de 2 GB y GitHub no la aceptaría como descarga."
+            exit 1
+          fi
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+
+      - name: Guardar como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.file }}
+          path: |
+            iso/out/${{ steps.name.outputs.file }}
+            iso/out/${{ steps.name.outputs.file }}.sha256
+          retention-days: 14
+          compression-level: 0
+
+      - name: Publicar versión
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            iso/out/${{ steps.name.outputs.file }}
+            iso/out/${{ steps.name.outputs.file }}.sha256
+          body: |
+            ## 🦖📺 T-Rex Bites ${{ github.ref_name }}
+
+            **Descarga `${{ steps.name.outputs.file }}`** y grábala en un USB de 4 GB o más con
+            [balenaEtcher](https://etcher.balena.io/).
+
+            - Se instala **sin internet**: el USB trae todo.
+            - ⚠️ La instalación **borra todo el disco** del computador.
+            - Guía completa en el [README](https://github.com/${{ github.repository }}#readme).
+
+            Para verificar la descarga: `sha256sum -c ${{ steps.name.outputs.file }}.sha256`
