@@ -110,8 +110,6 @@ jobs:
           name: T-Rex Bites ${{ steps.name.outputs.version }}
           # versions like v0.1.0-beta are published as test versions
           prerelease: ${{ contains(steps.name.outputs.version, '-') }}
-          # tags like v0.1.0-beta are published as test versions
-          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             iso/out/${{ steps.name.outputs.file }}
             iso/out/${{ steps.name.outputs.file }}.sha256
