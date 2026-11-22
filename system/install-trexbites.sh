@@ -284,10 +284,24 @@ else
     printf '127.0.1.1\t%s\n' "$HOSTNAME_TV" >> /etc/hosts
 fi
 
-step "Arranque silencioso"
+step "Menú de arranque"
 if [ -f /etc/default/grub ]; then
-    sed -i -E 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub
     sed -i -E 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3"/' /etc/default/grub
+    # list other systems on the disk (a Linux or Windows installed before) in the menu
+    if grep -q '^#\?GRUB_DISABLE_OS_PROBER' /etc/default/grub; then
+        sed -i -E 's/^#?GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
+    else
+        echo 'GRUB_DISABLE_OS_PROBER=false' >> /etc/default/grub
+    fi
+    if command -v os-prober >/dev/null && [ -n "$(os-prober 2>/dev/null)" ]; then
+        # shared computer: show the menu long enough to pick the other system
+        echo "Encontré otro sistema en el disco: queda en el menú de arranque."
+        sed -i -E 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=8/' /etc/default/grub
+        sed -i -E 's/^#?GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=menu/' /etc/default/grub
+    else
+        # T-Rex Bites alone: straight to the TV
+        sed -i -E 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub
+    fi
     update-grub || true
 fi
 

@@ -60,7 +60,14 @@ GitHub Actions arma el USB y lo publica en Releases automáticamente.
 
 ### 2. Instalar
 
-> ⚠️ **La instalación borra todo el disco del computador.**
+El USB ofrece dos formas de instalar:
+
+| Opción del menú | Para qué |
+|---|---|
+| **Instalar T-Rex Bites** | Computador dedicado a la tele. ⚠️ **Borra todo el disco.** |
+| **Instalar al lado de otro sistema** | Computador que ya tiene Linux (o Windows) y quieres conservar. Usa solo el espacio libre sin particionar; al prender eliges cuál arrancar. Ver la guía [Instalar al lado de otro sistema](docs/INSTALAR-JUNTO-A-OTRO-SISTEMA.md). |
+
+Pasos para un computador dedicado:
 
 1. Conecta el USB. No hace falta internet ni cable de red.
 2. Prende el computador y elige arrancar desde el USB. Según la marca, hay que

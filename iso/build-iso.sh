@@ -149,20 +149,57 @@ d-i netcfg/wireless_wpa string $WIFI_PASSWORD"
 d-i pkgsel/upgrade select full-upgrade"
 fi
 
-fill() {
-    local src="$1" dst="$2"
-    local kernel_args="auto=true priority=critical preseed/file=/cdrom/trexbites/preseed.cfg locale=$LOCALE keyboard-configuration/xkb-keymap=$KEYMAP vga=788 --- quiet"
-    awk -v net="$NETWORK_LINES" -v pkg="$PACKAGE_LINES" '
-        $0 == "@NETWORK_LINES@" { print net; next }
-        $0 == "@PACKAGE_LINES@" { print pkg; next }
-        { print }' "$src" \
-        | sed -e "s|@LOCALE@|$LOCALE|g" -e "s|@KEYMAP@|$KEYMAP|g" -e "s|@TIMEZONE@|$TIMEZONE|g" \
-              -e "s|@TV_PASSWORD@|$TV_PASSWORD|g" -e "s|@KERNEL_ARGS@|$kernel_args|g" > "$dst"
+# Two ways to install, each with its own answers file:
+#   whole disk  (preseed.cfg)        erases the disk; for a computer used only as the TV
+#   free space  (preseed-libre.cfg)  keeps every existing partition and only uses
+#                                    unpartitioned space; the boot menu lists both systems
+DISK_WHOLE="d-i partman-auto/method string regular
+d-i partman-auto/choose_recipe select atomic
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+d-i partman-efi/non_efi_system boolean true"
+GRUB_WHOLE="d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean false"
+# no LVM/RAID removal here: those answers would wipe existing volumes
+DISK_FREE="d-i partman-auto/init_automatically_partition select biggest_free
+d-i partman-auto/method string regular
+d-i partman-auto/choose_recipe select atomic
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+d-i partman-efi/non_efi_system boolean true"
+GRUB_FREE="d-i grub-installer/only_debian boolean false
+d-i grub-installer/with_other_os boolean true"
+
+kernel_args() {
+    echo "auto=true priority=critical preseed/file=/cdrom/trexbites/$1 locale=$LOCALE keyboard-configuration/xkb-keymap=$KEYMAP vga=788 --- quiet"
 }
 
-fill "$ISO_DIR/preseed.cfg.in" "$STAGE/trexbites/preseed.cfg"
+fill() {
+    local src="$1" dst="$2" disk="${3:-}" grub="${4:-}"
+    awk -v net="$NETWORK_LINES" -v pkg="$PACKAGE_LINES" -v disk="$disk" -v grub="$grub" '
+        $0 == "@NETWORK_LINES@" { print net; next }
+        $0 == "@PACKAGE_LINES@" { print pkg; next }
+        $0 == "@DISK_LINES@" { print disk; next }
+        $0 == "@GRUB_LINES@" { print grub; next }
+        { print }' "$src" \
+        | sed -e "s|@LOCALE@|$LOCALE|g" -e "s|@KEYMAP@|$KEYMAP|g" -e "s|@TIMEZONE@|$TIMEZONE|g" \
+              -e "s|@TV_PASSWORD@|$TV_PASSWORD|g" \
+              -e "s|@KERNEL_ARGS@|$(kernel_args preseed.cfg)|g" \
+              -e "s|@KERNEL_ARGS_LIBRE@|$(kernel_args preseed-libre.cfg)|g" > "$dst"
+}
+
+fill "$ISO_DIR/preseed.cfg.in" "$STAGE/trexbites/preseed.cfg" "$DISK_WHOLE" "$GRUB_WHOLE"
+fill "$ISO_DIR/preseed.cfg.in" "$STAGE/trexbites/preseed-libre.cfg" "$DISK_FREE" "$GRUB_FREE"
 fill "$ISO_DIR/isolinux.cfg.in" "$STAGE/isolinux.cfg"
 fill "$ISO_DIR/trexbites-confirm.cfg.in" "$STAGE/trexbites-confirm.cfg"
+fill "$ISO_DIR/trexbites-confirm-libre.cfg.in" "$STAGE/trexbites-confirm-libre.cfg"
 fill "$ISO_DIR/trexbites-style.cfg.in" "$STAGE/trexbites-style.cfg"
 fill "$ISO_DIR/grub.cfg.in" "$STAGE/grub.cfg"
 
@@ -176,6 +213,7 @@ xorriso -indev "$BASE_ISO" -outdev "$OUT_ISO" \
     -map "$STAGE/trexbites" /trexbites \
     -map "$STAGE/isolinux.cfg" /isolinux/isolinux.cfg \
     -map "$STAGE/trexbites-confirm.cfg" /isolinux/trexbites-confirm.cfg \
+    -map "$STAGE/trexbites-confirm-libre.cfg" /isolinux/trexbites-confirm-libre.cfg \
     -map "$STAGE/trexbites-style.cfg" /isolinux/trexbites-style.cfg \
     -map "$STAGE/grub.cfg" /boot/grub/grub.cfg \
     -boot_image any replay

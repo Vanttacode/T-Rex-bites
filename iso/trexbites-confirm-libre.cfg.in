@@ -1,0 +1,19 @@
+# Second screen for installing next to another system: only the free
+# (unpartitioned) space is used; existing partitions are not touched
+path
+include trexbites-style.cfg
+default vesamenu.c32
+prompt 0
+timeout 0
+menu title Se usara SOLO el espacio libre del disco
+
+label no
+    menu label ^No, volver
+    menu default
+    kernel vesamenu.c32
+    append isolinux.cfg
+
+label yes
+    menu label ^Si, instalar T-Rex Bites en el espacio libre
+    kernel /install.amd/vmlinuz
+    append initrd=/install.amd/initrd.gz @KERNEL_ARGS_LIBRE@

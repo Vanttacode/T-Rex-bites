@@ -31,6 +31,8 @@ dnsmasq-base
 nftables
 polkitd
 wireless-regdb
+# boot menu: finds a Linux or Windows already on the disk
+os-prober
 avahi-daemon
 libnss-mdns
 mesa-va-drivers
