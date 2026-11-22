@@ -219,3 +219,15 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .hist-prog { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0 4px 10px; color: var(--muted); font-size: 0.9rem; }
 .hist-prog span:first-child { overflow-wrap: anywhere; }
 .field .radio input { display: inline-block; width: auto; margin: 0 6px 0 0; padding: 0; vertical-align: middle; }
+
+/* wifi */
+.wifi-list { margin: 8px 0; }
+.wifi-net {
+  display: flex; width: 100%; align-items: center; gap: 10px; text-align: left;
+  font: inherit; color: var(--text); background: none; border: none; cursor: pointer;
+  padding: 12px 4px; border-top: 1px solid rgba(255,255,255,0.06);
+}
+.wifi-net .ssid { flex: 1; overflow-wrap: anywhere; }
+.wifi-net .bars { font-family: monospace; color: var(--accent-2); letter-spacing: -2px; }
+.wifi-net.current .ssid { color: var(--accent); font-weight: bold; }
+#wifi-other { margin-top: 6px; }

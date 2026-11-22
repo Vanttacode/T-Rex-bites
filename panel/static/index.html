@@ -124,6 +124,27 @@
 
     <!-- More -->
     <section id="tab-more" class="tab" hidden>
+      <div class="card" id="wifi-card">
+        <div class="card-head">
+          <h2>📶 WiFi</h2>
+          <button class="btn small ghost" id="wifi-scan">Buscar redes</button>
+        </div>
+        <p class="power-line" id="wifi-status">…</p>
+        <p class="error" id="wifi-error" role="alert"></p>
+        <div id="wifi-list" class="wifi-list"></div>
+        <div id="wifi-form" hidden>
+          <label class="field">Red <input type="text" id="wifi-ssid" maxlength="32" autocomplete="off"></label>
+          <label class="field">Clave del WiFi <input type="password" id="wifi-pass" maxlength="63" autocomplete="off"></label>
+          <label class="switch"><input type="checkbox" id="wifi-show"> Mostrar clave</label>
+          <div class="btn-row">
+            <button class="btn" id="wifi-connect">Conectar</button>
+            <button class="btn ghost" id="wifi-cancel">Cancelar</button>
+          </div>
+        </div>
+        <button class="btn small ghost" id="wifi-other">Otra red (oculta)</button>
+        <div class="warning" id="wifi-after" hidden></div>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <h2>📺 Canales</h2>
@@ -193,5 +214,6 @@
   <div class="toast" id="toast" role="status" hidden></div>
   <script src="/static/app.js"></script>
   <script src="/static/manage.js"></script>
+  <script src="/static/wifi.js"></script>
 </body>
 </html>

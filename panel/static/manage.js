@@ -26,6 +26,7 @@ function fmtTime(iso) {
 }
 
 function powerText(power) {
+  if (power && power.state === "setup") return "📶 La tele espera que le configures el WiFi (Más → WiFi).";
   if (!power || power.state === "on") {
     if (power && power.reason === "extra") return `⏰ Hora extra hasta ${fmtTime(power.until)}`;
     return "📺 La tele está encendida.";
@@ -248,6 +249,7 @@ function typeLabel(c) {
 }
 
 async function openMoreTab() {
+  loadWifi();
   renderHistory();
   try { await loadChannels(); } catch (e) { toast(e.message); return; }
   $("ch-list").replaceChildren(...channelsCache.map((c) => el("div", { class: "ch-row" },

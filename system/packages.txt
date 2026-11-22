@@ -24,6 +24,13 @@ pipewire
 pipewire-pulse
 wireplumber
 network-manager
+# WiFi: connect to protected networks, create the setup network, and let
+# the panel (user "tv") manage connections
+wpasupplicant
+dnsmasq-base
+nftables
+polkitd
+wireless-regdb
 avahi-daemon
 libnss-mdns
 mesa-va-drivers

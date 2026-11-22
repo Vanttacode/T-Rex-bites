@@ -12,14 +12,16 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import bedtime, channels
 from .fs42 import FS42Client, FS42Error
 from .history import History
 from .state import PanelState
+from .wifi import HOTSPOT_IP, WifiManager, validate as validate_wifi
 
 log = logging.getLogger("trexbites.panel")
 
@@ -31,6 +33,8 @@ PLACEHOLDER = Path(os.environ.get("TREXBITES_PLACEHOLDER", "/opt/trexbites/media
 IDENT = Path(os.environ.get("TREXBITES_IDENT", "/opt/trexbites/media/_ident_trexbites.mp4"))
 # "systemd" switches the screen for bedtime; "none" only computes it (development, tests)
 POWER_BACKEND = os.environ.get("TREXBITES_POWER", "systemd")
+# "nmcli" manages WiFi through NetworkManager; "none" disables it (development, tests)
+WIFI_BACKEND = os.environ.get("TREXBITES_WIFI", "nmcli")
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 PLACEHOLDER_NAME = "_bienvenida_trexbites.mp4"
@@ -60,6 +64,9 @@ async def apply_power(app_, now=None):
         state.set("power_override", None)
         override = None
     power_state, reason, until = bedtime.desired_state(now, bedtime_settings(state), override)
+    if app_.state.wifi.needs_setup:
+        # first start without any network: the screen explains how to set up WiFi
+        power_state, reason, until = "setup", "wifi", None
     app_.state.power = {"state": power_state, "reason": reason,
                         "until": until.isoformat(timespec="minutes") if until else None}
     if POWER_BACKEND == "systemd":
@@ -67,10 +74,29 @@ async def apply_power(app_, now=None):
     return app_.state.power
 
 
+async def announce_address(app_):
+    """Once online, show on the TV where the panel is, in case trexbites.local fails."""
+    wifi = app_.state.wifi
+    ip = wifi.status_cache.get("ip")
+    message = "Entra desde tu teléfono a http://trexbites.local"
+    if ip:
+        message += f"  ·  o a http://{ip}"
+    try:
+        await app_.state.fs42.request("POST", "/player/ticker", body={
+            "message": message, "header": "T-Rex Bites conectado", "iterations": 3})
+        wifi.just_connected = False
+    except FS42Error:
+        pass  # the player may still be starting: try again on the next pass
+
+
 async def tv_loop(app_):
     last_sample = 0.0
     while True:
         try:
+            if WIFI_BACKEND == "nmcli":
+                await asyncio.to_thread(app_.state.wifi.tick)
+                if app_.state.wifi.just_connected:
+                    await announce_address(app_)
             power = await apply_power(app_)
             if power["state"] == "on" and time.monotonic() - last_sample >= 60:
                 last_sample = time.monotonic()
@@ -96,6 +122,7 @@ app.state.panel = PanelState(STATE_PATH)
 app.state.fs42 = FS42Client(FS42_URL, FS42_DIR)
 app.state.history = History(HISTORY_PATH)
 app.state.tv_power = bedtime.TVPower()
+app.state.wifi = WifiManager()
 app.state.power = {"state": "on", "reason": None, "until": None}
 _login_failures = defaultdict(deque)
 
@@ -234,6 +261,18 @@ async def manifest():
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def not_found_to_panel(request: Request, exc: StarletteHTTPException):
+    """Unknown pages open the panel. While the setup network is on, phones check
+    pages like connectivitycheck.gstatic.com/generate_204 to detect a "captive
+    portal": answering with the panel makes the setup page open by itself."""
+    if exc.status_code == 404 and request.method == "GET" and not request.url.path.startswith("/api/"):
+        if request.app.state.wifi.status_cache.get("hotspot"):
+            return RedirectResponse(f"http://{HOTSPOT_IP}/", status_code=302)
+        return RedirectResponse("/", status_code=302)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
 
 # ---------- session ----------
@@ -532,3 +571,55 @@ async def get_history(request: Request, days: int = 7):
         for program in day["programs"]:
             program["channel_name"] = names.get(program["network"], program["network"])
     return {"days": summary}
+
+
+# ---------- WiFi ----------
+
+class WifiConnectBody(BaseModel):
+    ssid: str
+    password: str = ""
+
+
+def _wifi_info(app_):
+    wifi = app_.state.wifi
+    return {**wifi.status_cache, "networks": wifi.networks, "connecting": wifi.connecting,
+            "last_error": wifi.last_error, "needs_setup": wifi.needs_setup}
+
+
+@app.get("/api/wifi", dependencies=[Depends(require_session)])
+async def get_wifi(request: Request):
+    wifi = request.app.state.wifi
+    if WIFI_BACKEND == "nmcli" and not wifi.connecting:
+        wifi.status_cache = await asyncio.to_thread(wifi.status)
+    return _wifi_info(request.app)
+
+
+@app.post("/api/wifi/scan", dependencies=[Depends(require_session)])
+async def scan_wifi(request: Request):
+    wifi = request.app.state.wifi
+    # while the setup network is on, the WiFi chip can't search: keep the list
+    # found just before it opened
+    if WIFI_BACKEND == "nmcli" and not wifi.connecting and not wifi.status_cache.get("hotspot"):
+        await asyncio.to_thread(wifi.scan)
+    return _wifi_info(request.app)
+
+
+@app.post("/api/wifi/connect", dependencies=[Depends(require_session)])
+async def connect_wifi(body: WifiConnectBody, request: Request):
+    try:
+        ssid, password = validate_wifi(body.ssid, body.password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    wifi = request.app.state.wifi
+    if wifi.connecting:
+        raise HTTPException(status_code=409, detail="Ya se está conectando, espera un momento.")
+    if WIFI_BACKEND == "nmcli":
+        wifi.connecting = True
+
+        async def later():
+            # answer the phone first: joining the home WiFi turns off the setup network
+            await asyncio.sleep(3)
+            await asyncio.to_thread(wifi.connect, ssid, password)
+
+        asyncio.get_running_loop().create_task(later())
+    return {"ok": True, "ssid": ssid}

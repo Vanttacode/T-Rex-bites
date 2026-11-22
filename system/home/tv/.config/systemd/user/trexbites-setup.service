@@ -1,0 +1,13 @@
+# Screen with WiFi setup instructions, shown on the first start when the box
+# has no network yet. Starting it stops the TV and the bedtime screen.
+[Unit]
+Description=T-Rex Bites - pantalla de configuración de WiFi
+Conflicts=fs42.service trexbites-bedtime.service
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/mpv --fs --no-osc --no-input-default-bindings --no-audio --image-display-duration=inf --loop-file=inf /opt/trexbites/media/configurar_wifi.png
+Restart=always
+RestartSec=5

@@ -122,11 +122,12 @@ async function refreshStatus() {
   try {
     const s = await api("/api/status");
     const asleep = s.power && s.power.state === "off";
-    $("onair").hidden = !s.online || asleep;
+    const notTv = s.power && s.power.state !== "on";
+    $("onair").hidden = !s.online || notTv;
     $("sleeping").hidden = !asleep;
     const p = s.player || {};
     const now = $("now-playing");
-    if (asleep) {
+    if (notTv) {
       now.textContent = powerText(s.power);
     } else if (!s.online) {
       now.textContent = "La tele está apagada o reiniciándose…";
@@ -288,7 +289,16 @@ async function startApp(pinIsDefault) {
   $("view-login").hidden = true;
   $("view-app").hidden = false;
   $("pin-default-warning").hidden = !pinIsDefault;
-  if (pinIsDefault) {
+  let wifiSetup = false;
+  try {
+    const w = await api("/api/wifi");
+    wifiSetup = !!(w.hotspot || w.needs_setup);
+  } catch (_) { /* panel without WiFi support */ }
+  if (wifiSetup) {
+    // opened from the "T-Rex Bites Config" network: WiFi first
+    showTab("more");
+    $("wifi-card").scrollIntoView();
+  } else if (pinIsDefault) {
     showTab("more");
     $("pin-card").scrollIntoView();
     toast("Por seguridad, cambia el PIN de fábrica");

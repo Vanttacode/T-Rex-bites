@@ -54,6 +54,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("TREXBITES_HISTORY", str(tmp_path / "state" / "history.db"))
     monkeypatch.setenv("TREXBITES_PLACEHOLDER", str(placeholder))
     monkeypatch.setenv("TREXBITES_POWER", "none")
+    monkeypatch.setenv("TREXBITES_WIFI", "none")
     monkeypatch.setenv("TREXBITES_FS42_URL", "http://127.0.0.1:9")
 
     from trexbites_panel import app as app_module

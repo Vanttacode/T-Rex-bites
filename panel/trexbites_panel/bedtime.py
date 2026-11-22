@@ -25,6 +25,10 @@ EXTRA_TIME = dt.timedelta(hours=1)
 
 PLAYER_UNIT = "fs42.service"
 BEDTIME_UNIT = "trexbites-bedtime.service"
+SETUP_UNIT = "trexbites-setup.service"
+# what the screen shows for each state; the units conflict with each other,
+# so starting one stops the others
+UNITS = {"on": PLAYER_UNIT, "off": BEDTIME_UNIT, "setup": SETUP_UNIT}
 
 
 def clean_settings(data):
@@ -112,7 +116,8 @@ def make_override(mode, now, settings):
 
 
 class TVPower:
-    """Switches the screen between the TV player and the bedtime picture, using
+    """Switches the screen between the TV player, the bedtime picture and the
+    WiFi setup instructions, using
     the tv user's systemd services (the panel runs as that same user)."""
 
     def __init__(self, runner=subprocess.run):
@@ -128,7 +133,7 @@ class TVPower:
                          capture_output=True, text=True, timeout=20)
 
     def apply(self, state):
-        unit = BEDTIME_UNIT if state == "off" else PLAYER_UNIT
+        unit = UNITS[state]
         try:
             if self._systemctl("is-active", "--quiet", unit).returncode != 0:
                 log.info("switching TV to %s", unit)

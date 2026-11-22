@@ -192,6 +192,19 @@ if [ ! -f "$MEDIA_ASSETS/a_dormir.png" ]; then
         -vf "drawtext=fontfile=$FONT:text='zzz...':fontsize=72:fontcolor=0xa9abc9:x=(w-tw)/2:y=h/2-190,drawtext=fontfile=$FONT:text='¡A dormir!':fontsize=120:fontcolor=0xff8a1f:borderw=6:x=(w-tw)/2:y=h/2-90,drawtext=fontfile=$FONT:text='T-Rex TV vuelve mañana':fontsize=48:fontcolor=white:x=(w-tw)/2:y=h/2+80" \
         "$MEDIA_ASSETS/a_dormir.png"
 fi
+if [ ! -f "$MEDIA_ASSETS/configurar_wifi.png" ]; then
+    # shown on the first start, until the WiFi is set up from a phone
+    ffmpeg -hide_banner -loglevel error -y \
+        -f lavfi -i "color=c=0x12142b:size=1280x720" -frames:v 1 \
+        -vf "drawtext=fontfile=$FONT:text='Configura el WiFi de T-Rex Bites':fontsize=56:fontcolor=0xff8a1f:x=(w-tw)/2:y=70,\
+drawtext=fontfile=$FONT:text='1.  En tu teléfono, conéctate a la red WiFi\:':fontsize=38:fontcolor=white:x=110:y=200,\
+drawtext=fontfile=$FONT:text='T-Rex Bites Config':fontsize=72:fontcolor=0x4cd964:x=(w-tw)/2:y=265,\
+drawtext=fontfile=$FONT:text='2.  Se abre sola la página de configuración':fontsize=38:fontcolor=white:x=110:y=400,\
+drawtext=fontfile=$FONT:text='(si no se abre, entra a http\://10.42.0.1)':fontsize=30:fontcolor=0xa9abc9:x=160:y=450,\
+drawtext=fontfile=$FONT:text='3.  PIN 1234, elige tu WiFi y escribe su clave':fontsize=38:fontcolor=white:x=110:y=530,\
+drawtext=fontfile=$FONT:text='Después la tele empieza sola':fontsize=32:fontcolor=0xa9abc9:x=(w-tw)/2:y=640" \
+        "$MEDIA_ASSETS/configurar_wifi.png"
+fi
 IDENT=$MEDIA_ASSETS/_ident_trexbites.mp4
 if [ ! -f "$IDENT" ]; then
     # short station ident that fills the gaps between programs
@@ -204,7 +217,7 @@ if [ ! -f "$IDENT" ]; then
         -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -shortest \
         "$IDENT"
 fi
-chmod 644 "$PLACEHOLDER" "$MEDIA_ASSETS/a_dormir.png" "$IDENT"
+chmod 644 "$PLACEHOLDER" "$MEDIA_ASSETS/a_dormir.png" "$MEDIA_ASSETS/configurar_wifi.png" "$IDENT"
 
 # FieldStation42 needs at least one video per category: empty folders get the sample clip
 while IFS= read -r folder; do

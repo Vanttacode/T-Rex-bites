@@ -14,8 +14,8 @@
 ## 🔜 Fase 2: primera prueba en hardware real
 
 - [ ] Instalar en el notebook Lenovo y anotar qué falla (WiFi, video, sonido).
-- [ ] Mostrar en la tele la IP del equipo cuando `trexbites.local` no funcione.
-- [ ] Cambiar de red WiFi desde el panel (NetworkManager).
+- [x] Mostrar en la tele la IP del equipo cuando `trexbites.local` no funcione.
+- [x] Configurar y cambiar la red WiFi desde el teléfono (red "T-Rex Bites Config" + portal cautivo).
 - [ ] Convertir automáticamente los videos pesados a un formato liviano
       (H.264 720p) para equipos lentos.
 

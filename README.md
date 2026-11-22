@@ -67,9 +67,17 @@ GitHub Actions arma el USB y lo publica en Releases automáticamente.
    presionar **F12**, **F9**, **F2**, **Esc** o **Novo** (Lenovo) al encenderlo.
 3. Elige **Instalar T-Rex Bites** y luego **Sí, borrar el disco e instalar**.
 4. Espera unos 15 a 30 minutos. El computador se reinicia solo y aparece la tele.
-5. Para usar el panel desde el teléfono, la tele debe estar en la red de la casa:
-   conecta un **cable de red** al router. *(Configurar el WiFi desde el teléfono
-   llega en la próxima versión.)*
+5. **Configura el WiFi desde el teléfono** (no hace falta tocar el router):
+   - La tele muestra *"Configura el WiFi de T-Rex Bites"*.
+   - En tu teléfono, conéctate a la red WiFi **"T-Rex Bites Config"** (sin clave).
+   - Se abre sola la página de configuración (si no, entra a `http://10.42.0.1`).
+   - PIN **1234** → elige tu WiFi de casa → escribe su clave → **Conectar**.
+   - Vuelve a conectar el teléfono a tu WiFi de casa y entra a `http://trexbites.local`.
+     La tele muestra en pantalla su dirección por si `.local` no funciona.
+
+   Si después cambias de router o de clave, la tele vuelve a abrir la red
+   "T-Rex Bites Config" sola (sin dejar de pasar los canales), y repites el paso.
+   Con cable de red no hace falta configurar nada.
 
 ### 3. Usar
 
@@ -85,7 +93,7 @@ Para tenerlo como app en el teléfono, en el navegador usa
 | 📤 **Subir** | Subir videos a un canal y categoría (con barra de progreso) |
 | 📚 **Programas** | Ver y borrar los videos de cada canal |
 | 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y **grilla semanal** de cada canal: eliges un pincel (categoría, fin de transmisión o apagado) y tocas las horas |
-| ☰ **Más** | Crear y editar **canales** y sus categorías, **qué se vio** cada día, PIN y opciones avanzadas |
+| ☰ **Más** | **WiFi**, crear y editar **canales** y sus categorías, **qué se vio** cada día, PIN y opciones avanzadas |
 
 ---
 
