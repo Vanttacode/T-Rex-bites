@@ -62,6 +62,14 @@ El PIN de fábrica es **1234** y el panel te pide cambiarlo la primera vez.
 Para tenerlo como app en el teléfono, en el navegador usa
 **"Agregar a pantalla de inicio"**.
 
+| Pestaña | Para qué |
+|---|---|
+| 🎮 **Control** | Control remoto: canal, volumen, guía y botones directos a cada canal |
+| 📤 **Subir** | Subir videos a un canal y categoría (con barra de progreso) |
+| 📚 **Programas** | Ver y borrar los videos de cada canal |
+| 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y **grilla semanal** de cada canal: eliges un pincel (categoría, fin de transmisión o apagado) y tocas las horas |
+| ☰ **Más** | Crear y editar **canales** y sus categorías, **qué se vio** cada día, PIN y opciones avanzadas |
+
 ---
 
 ## ¿En qué computadores funciona?

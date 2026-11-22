@@ -101,6 +101,8 @@ function showTab(name) {
   document.querySelectorAll(".tabbar button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   if (name === "library") renderLibrary();
   if (name === "upload") refreshDisk();
+  if (name === "schedule") openScheduleTab();
+  if (name === "more") openMoreTab();
 }
 
 // ---------- remote ----------
@@ -119,10 +121,14 @@ async function sendRemote(action, channel) {
 async function refreshStatus() {
   try {
     const s = await api("/api/status");
-    $("onair").hidden = !s.online;
+    const asleep = s.power && s.power.state === "off";
+    $("onair").hidden = !s.online || asleep;
+    $("sleeping").hidden = !asleep;
     const p = s.player || {};
     const now = $("now-playing");
-    if (!s.online) {
+    if (asleep) {
+      now.textContent = powerText(s.power);
+    } else if (!s.online) {
       now.textContent = "La tele está apagada o reiniciándose…";
     } else {
       now.replaceChildren(
@@ -283,7 +289,8 @@ async function startApp(pinIsDefault) {
   $("view-app").hidden = false;
   $("pin-default-warning").hidden = !pinIsDefault;
   if (pinIsDefault) {
-    showTab("settings");
+    showTab("more");
+    $("pin-card").scrollIntoView();
     toast("Por seguridad, cambia el PIN de fábrica");
   } else {
     showTab("remote");

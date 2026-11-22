@@ -29,7 +29,11 @@
 
 ## 👨‍👧 Fase 4: para padres
 
-- [ ] Horario de apagado editable desde el panel.
-- [ ] Crear y renombrar canales desde el panel.
+- [x] Grilla semanal de programación por canal (pintar horas con categorías o fin de transmisión).
+- [x] Hora de dormir: apagado automático con pantalla "¡A dormir!", "Apagar hasta mañana" y "1 hora extra".
+- [x] Crear, renombrar, renumerar y borrar canales, con sus categorías.
+- [x] Historial: qué pasó la tele cada día y cuántos minutos.
+- [ ] Botón "Actualizar T-Rex Bites" en el panel.
+- [ ] Límite diario de minutos (necesita un botón de encendido: control remoto físico).
 - [ ] Ver el canal en vivo desde el navegador (otra tele de la casa).
 - [ ] Imagen para Raspberry Pi.

@@ -73,6 +73,22 @@ class PanelState:
             self._write(data)
             self._data = data
 
+    def get(self, key, default=None):
+        """Other panel settings (bedtime, power override), stored next to the PIN."""
+        return self._data.get("settings", {}).get(key, default)
+
+    def set(self, key, value):
+        with self._lock:
+            data = dict(self._data)
+            settings = dict(data.get("settings", {}))
+            if value is None:
+                settings.pop(key, None)
+            else:
+                settings[key] = value
+            data["settings"] = settings
+            self._write(data)
+            self._data = data
+
     def session_token(self):
         msg = f"trexbites-session-{self._data['session_version']}".encode()
         return hmac.new(bytes.fromhex(self._data["secret"]), msg, hashlib.sha256).hexdigest()

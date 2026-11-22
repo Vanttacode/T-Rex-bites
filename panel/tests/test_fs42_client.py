@@ -82,3 +82,31 @@ def test_changes_during_rebuild_trigger_one_more_pass(fake_fs42):
 
     asyncio.run(scenario())
     assert _catalog_starts(calls) == 2
+
+
+def test_restart_waits_for_rebuild_and_runs_once(fake_fs42):
+    client, calls = fake_fs42
+
+    async def scenario():
+        client.schedule_rebuild("TRexTV", restart=True)
+        client.schedule_rebuild("DinoLoop", restart=True)
+        await client._pending["TRexTV"]
+        await client._pending["DinoLoop"]
+        await client._restart_task
+
+    asyncio.run(scenario())
+    paths = [c[1] for c in calls]
+    assert paths.count("/manage/restart") == 1
+    # the restart comes after both channels were rebuilt
+    assert paths[-1] == "/manage/restart"
+    assert client.rebuilds["_player"]["status"] == "done"
+
+
+def test_station_crud_paths(fake_fs42):
+    client, calls = fake_fs42
+    asyncio.run(client.create_station({"network_name": "Nuevo"}))
+    asyncio.run(client.update_station("Nuevo", {"network_name": "Nuevo"}))
+    asyncio.run(client.delete_station("Nuevo"))
+    assert [(m, p) for m, p, _ in calls] == [
+        ("POST", "/stations"), ("PUT", "/stations/Nuevo"), ("DELETE", "/stations/Nuevo"),
+    ]

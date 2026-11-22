@@ -1,10 +1,14 @@
 """T-Rex Bites panel: the web page parents open at http://trexbites.local."""
 
+import asyncio
+import datetime as dt
+import logging
 import os
 import re
 import shutil
 import time
 from collections import defaultdict, deque
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -12,14 +16,24 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import channels
+from . import bedtime, channels
 from .fs42 import FS42Client, FS42Error
+from .history import History
 from .state import PanelState
+
+log = logging.getLogger("trexbites.panel")
 
 FS42_DIR = Path(os.environ.get("TREXBITES_FS42_DIR", "/opt/trexbites/fieldstation42"))
 FS42_URL = os.environ.get("TREXBITES_FS42_URL", "http://127.0.0.1:4242")
 STATE_PATH = Path(os.environ.get("TREXBITES_STATE", "/var/lib/trexbites/panel.json"))
+HISTORY_PATH = Path(os.environ.get("TREXBITES_HISTORY", "/var/lib/trexbites/history.db"))
+PLACEHOLDER = Path(os.environ.get("TREXBITES_PLACEHOLDER", "/opt/trexbites/media/_bienvenida_trexbites.mp4"))
+# "systemd" switches the screen for bedtime; "none" only computes it (development, tests)
+POWER_BACKEND = os.environ.get("TREXBITES_POWER", "systemd")
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+PLACEHOLDER_NAME = "_bienvenida_trexbites.mp4"
+LOOP_SECONDS = 20
 
 SESSION_COOKIE = "trexbites_session"
 SESSION_MAX_AGE = 365 * 24 * 60 * 60
@@ -32,9 +46,56 @@ VIDEO_EXTENSIONS = {
     ".mp4", ".m4v", ".mkv", ".avi", ".mov", ".webm", ".mpg", ".mpeg", ".ts", ".wmv", ".flv",
 }
 
-app = FastAPI(title="T-Rex Bites", docs_url=None, redoc_url=None, openapi_url=None)
+def bedtime_settings(state):
+    return {**bedtime.DEFAULT_SETTINGS, **(state.get("bedtime") or {})}
+
+
+async def apply_power(app_, now=None):
+    """Work out whether the TV should be on or showing "¡A dormir!", and make it so."""
+    now = now or dt.datetime.now()
+    state = app_.state.panel
+    override = state.get("power_override")
+    if override and override.get("until", 0) <= now.timestamp():
+        state.set("power_override", None)
+        override = None
+    power_state, reason, until = bedtime.desired_state(now, bedtime_settings(state), override)
+    app_.state.power = {"state": power_state, "reason": reason,
+                        "until": until.isoformat(timespec="minutes") if until else None}
+    if POWER_BACKEND == "systemd":
+        await asyncio.to_thread(app_.state.tv_power.apply, power_state)
+    return app_.state.power
+
+
+async def tv_loop(app_):
+    last_sample = 0.0
+    while True:
+        try:
+            power = await apply_power(app_)
+            if power["state"] == "on" and time.monotonic() - last_sample >= 60:
+                last_sample = time.monotonic()
+                try:
+                    status = await app_.state.fs42.status()
+                    await asyncio.to_thread(app_.state.history.record_minute, dt.datetime.now(), status)
+                except FS42Error:
+                    pass
+        except Exception:  # the loop must survive anything; the next pass retries
+            log.exception("tv loop pass failed")
+        await asyncio.sleep(LOOP_SECONDS)
+
+
+@asynccontextmanager
+async def lifespan(app_):
+    task = asyncio.create_task(tv_loop(app_))
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="T-Rex Bites", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 app.state.panel = PanelState(STATE_PATH)
 app.state.fs42 = FS42Client(FS42_URL, FS42_DIR)
+app.state.history = History(HISTORY_PATH)
+app.state.tv_power = bedtime.TVPower()
+app.state.power = {"state": "on", "reason": None, "until": None}
 _login_failures = defaultdict(deque)
 
 
@@ -124,10 +185,26 @@ def list_videos(folder):
                 "name": path.name,
                 "size": st.st_size,
                 "modified": int(st.st_mtime),
-                # placeholder clips that ship with T-Rex Bites start with "_"
-                "placeholder": path.name.startswith("_"),
+                # the sample clip T-Rex Bites puts in empty folders
+                "placeholder": path.name == PLACEHOLDER_NAME,
             })
     return videos
+
+
+def fill_if_empty(folder):
+    """FieldStation42 needs at least one video per category: empty folders get the sample clip."""
+    folder.mkdir(parents=True, exist_ok=True)
+    if not list_videos(folder) and PLACEHOLDER.is_file():
+        shutil.copyfile(PLACEHOLDER, folder / PLACEHOLDER_NAME)
+
+
+def remove_placeholder(folder):
+    (folder / PLACEHOLDER_NAME).unlink(missing_ok=True)
+
+
+def ensure_folders(conf):
+    for _, folder in channels.station_folders(conf, FS42_DIR):
+        fill_if_empty(folder)
 
 
 def media_root():
@@ -227,7 +304,8 @@ async def status(request: Request):
         online = "error" not in player
     except FS42Error:
         player, online = {}, False
-    return {"online": online, "player": player, "rebuilds": client.rebuilds}
+    return {"online": online, "player": player, "rebuilds": client.rebuilds,
+            "power": request.app.state.power}
 
 
 # ---------- channels and library ----------
@@ -243,7 +321,8 @@ async def get_channels():
                 "label": folder["label"],
                 "videos": list_videos(Path(folder["path"])),
             })
-        result.append({**{k: channel[k] for k in ("name", "long_name", "number", "type")},
+        result.append({**{k: channel[k] for k in ("name", "long_name", "number", "type",
+                                                  "categories", "schedule")},
                        "folders": folders})
     return {"channels": result}
 
@@ -281,6 +360,10 @@ async def upload(
     finally:
         await file.close()
 
+    # the first real video replaces the sample clip
+    if target.name != PLACEHOLDER_NAME:
+        remove_placeholder(folder)
+
     fs42_client(request).schedule_rebuild(ch["name"])
     return {"ok": True, "name": target.name}
 
@@ -298,5 +381,145 @@ async def delete_video(body: DeleteBody, request: Request):
     if body.name != Path(body.name).name or body.name not in {v["name"] for v in list_videos(folder)}:
         raise HTTPException(status_code=404, detail="Ese video no existe.")
     (folder / body.name).unlink()
+    fill_if_empty(folder)
     fs42_client(request).schedule_rebuild(ch["name"])
     return {"ok": True}
+
+
+# ---------- channel management ----------
+
+class NewChannelBody(BaseModel):
+    long_name: str
+    number: int
+    type: str = "standard"
+    categories: list[str] = []
+
+
+class EditChannelBody(BaseModel):
+    long_name: str
+    number: int
+    # existing categories as {"tag", "label"}, new ones as plain labels
+    categories: list[str | dict[str, str]] | None = None
+
+
+class ScheduleBody(BaseModel):
+    week: dict[str, dict[str, str]]
+
+
+def _confs_dir():
+    return FS42_DIR / "confs"
+
+
+def _channel_error(e):
+    return HTTPException(status_code=400, detail=str(e))
+
+
+async def _save_on_tv(coro):
+    try:
+        await coro
+    except FS42Error as e:
+        raise HTTPException(status_code=502, detail=f"No se pudo guardar: {e}")
+
+
+@app.post("/api/channels", dependencies=[Depends(require_session)])
+async def create_channel(body: NewChannelBody, request: Request):
+    try:
+        conf = channels.new_station_conf(channels.load_stations(_confs_dir()), body.long_name,
+                                         body.number, body.type, body.categories)
+    except channels.ChannelError as e:
+        raise _channel_error(e)
+    await _save_on_tv(fs42_client(request).create_station(conf))
+    ensure_folders(conf)
+    fs42_client(request).schedule_rebuild(conf["network_name"], restart=True)
+    return {"ok": True, "name": conf["network_name"]}
+
+
+@app.put("/api/channels/{name}", dependencies=[Depends(require_session)])
+async def edit_channel(name: str, body: EditChannelBody, request: Request):
+    try:
+        old = channels.find_station(_confs_dir(), name)
+        conf = channels.update_station_conf(old, channels.load_stations(_confs_dir()), body.long_name,
+                                            body.number, body.categories)
+    except channels.ChannelError as e:
+        raise _channel_error(e)
+    await _save_on_tv(fs42_client(request).update_station(name, conf))
+    ensure_folders(conf)
+    # the player only reads channel names and numbers when it starts
+    restart = (old.get("channel_number") != conf["channel_number"]
+               or old.get("network_long_name") != conf.get("network_long_name"))
+    fs42_client(request).schedule_rebuild(name, restart=restart)
+    return {"ok": True}
+
+
+@app.delete("/api/channels/{name}", dependencies=[Depends(require_session)])
+async def delete_channel(name: str, request: Request):
+    try:
+        channels.find_station(_confs_dir(), name)
+    except channels.ChannelError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    # the channel's videos stay on disk; a new channel with the same name finds them again
+    await _save_on_tv(fs42_client(request).delete_station(name))
+    fs42_client(request).schedule_restart()
+    return {"ok": True}
+
+
+@app.put("/api/channels/{name}/schedule", dependencies=[Depends(require_session)])
+async def save_schedule(name: str, body: ScheduleBody, request: Request):
+    try:
+        conf = channels.set_week(channels.find_station(_confs_dir(), name), body.week)
+    except channels.ChannelError as e:
+        raise _channel_error(e)
+    await _save_on_tv(fs42_client(request).update_station(name, conf))
+    ensure_folders(conf)
+    fs42_client(request).schedule_rebuild(name)
+    return {"ok": True}
+
+
+# ---------- bedtime and power ----------
+
+class PowerBody(BaseModel):
+    mode: str
+
+
+@app.get("/api/bedtime", dependencies=[Depends(require_session)])
+async def get_bedtime(request: Request):
+    power = await apply_power(request.app)
+    return {"settings": bedtime_settings(panel_state(request)), "power": power}
+
+
+@app.put("/api/bedtime", dependencies=[Depends(require_session)])
+async def put_bedtime(body: dict, request: Request):
+    try:
+        settings = bedtime.clean_settings(body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    panel_state(request).set("bedtime", settings)
+    power = await apply_power(request.app)
+    return {"settings": settings, "power": power}
+
+
+@app.post("/api/power", dependencies=[Depends(require_session)])
+async def set_power(body: PowerBody, request: Request):
+    state = panel_state(request)
+    if body.mode == "auto":
+        state.set("power_override", None)
+    else:
+        try:
+            override = bedtime.make_override(body.mode, dt.datetime.now(), bedtime_settings(state))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        state.set("power_override", override)
+    return {"power": await apply_power(request.app)}
+
+
+# ---------- history ----------
+
+@app.get("/api/history", dependencies=[Depends(require_session)])
+async def get_history(request: Request, days: int = 7):
+    days = max(1, min(days, 31))
+    names = {c["name"]: c["long_name"] for c in all_channels()}
+    summary = request.app.state.history.summary(dt.date.today(), days)
+    for day in summary:
+        for program in day["programs"]:
+            program["channel_name"] = names.get(program["network"], program["network"])
+    return {"days": summary}

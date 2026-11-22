@@ -319,6 +319,26 @@
       "20": {
         "event": "signoff"
       }
+    },
+    "trexbites": {
+      "categories": [
+        {
+          "tag": "manana",
+          "label": "Mañana"
+        },
+        {
+          "tag": "dibujos",
+          "label": "Dibujos animados"
+        },
+        {
+          "tag": "educativo",
+          "label": "Educativos"
+        },
+        {
+          "tag": "peliculas",
+          "label": "Películas"
+        }
+      ]
     }
   }
 }

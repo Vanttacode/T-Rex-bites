@@ -1,0 +1,13 @@
+# The "¡A dormir!" screen. It conflicts with the TV player, so starting one
+# stops the other; the T-Rex Bites panel switches between them.
+[Unit]
+Description=T-Rex Bites - pantalla de hora de dormir
+Conflicts=fs42.service
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/mpv --fs --no-osc --no-input-default-bindings --no-audio --image-display-duration=inf --loop-file=inf /opt/trexbites/media/a_dormir.png
+Restart=always
+RestartSec=5

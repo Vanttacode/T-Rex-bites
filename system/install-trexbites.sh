@@ -130,21 +130,35 @@ if [ ! -x "$FS42_DIR/env/bin/python3" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-step "Creando videos de ejemplo en los canales vacíos"
+step "Creando el video de ejemplo y la pantalla de \"¡A dormir!\""
 FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+MEDIA_ASSETS=$PREFIX/media
+mkdir -p "$MEDIA_ASSETS"
+PLACEHOLDER=$MEDIA_ASSETS/_bienvenida_trexbites.mp4
+if [ ! -f "$PLACEHOLDER" ]; then
+    ffmpeg -hide_banner -loglevel error -y \
+        -f lavfi -i "smptebars=size=1280x720:rate=25" \
+        -f lavfi -i "sine=frequency=440:sample_rate=48000" \
+        -t 120 \
+        -vf "drawtext=fontfile=$FONT:text='T-REX BITES':fontsize=96:fontcolor=white:borderw=6:x=(w-tw)/2:y=h/2-140,drawtext=fontfile=$FONT:text='Sube tus programas desde el telefono':fontsize=42:fontcolor=white:borderw=4:x=(w-tw)/2:y=h/2,drawtext=fontfile=$FONT:text='http\://trexbites.local':fontsize=54:fontcolor=yellow:borderw=4:x=(w-tw)/2:y=h/2+80" \
+        -af "volume=0.05" \
+        -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -shortest \
+        "$PLACEHOLDER"
+fi
+if [ ! -f "$MEDIA_ASSETS/a_dormir.png" ]; then
+    ffmpeg -hide_banner -loglevel error -y \
+        -f lavfi -i "color=c=0x12142b:size=1280x720" -frames:v 1 \
+        -vf "drawtext=fontfile=$FONT:text='zzz...':fontsize=72:fontcolor=0xa9abc9:x=(w-tw)/2:y=h/2-190,drawtext=fontfile=$FONT:text='¡A dormir!':fontsize=120:fontcolor=0xff8a1f:borderw=6:x=(w-tw)/2:y=h/2-90,drawtext=fontfile=$FONT:text='T-Rex TV vuelve mañana':fontsize=48:fontcolor=white:x=(w-tw)/2:y=h/2+80" \
+        "$MEDIA_ASSETS/a_dormir.png"
+fi
+chmod 644 "$PLACEHOLDER" "$MEDIA_ASSETS/a_dormir.png"
+
+# FieldStation42 needs at least one video per category: empty folders get the sample clip
 while IFS= read -r folder; do
     [ -n "$folder" ] || continue
     as_tv mkdir -p "$folder"
     if [ -z "$(find "$folder" -maxdepth 1 -type f -print -quit)" ]; then
-        label=$(basename "$folder")
-        as_tv ffmpeg -hide_banner -loglevel error -y \
-            -f lavfi -i "smptebars=size=1280x720:rate=25" \
-            -f lavfi -i "sine=frequency=440:sample_rate=48000" \
-            -t 120 \
-            -vf "drawtext=fontfile=$FONT:text='T-REX BITES':fontsize=96:fontcolor=white:borderw=6:x=(w-tw)/2:y=h/2-140,drawtext=fontfile=$FONT:text='Sube tus programas desde el telefono':fontsize=42:fontcolor=white:borderw=4:x=(w-tw)/2:y=h/2,drawtext=fontfile=$FONT:text='http\://trexbites.local':fontsize=54:fontcolor=yellow:borderw=4:x=(w-tw)/2:y=h/2+80,drawtext=fontfile=$FONT:text='$label':fontsize=32:fontcolor=white:borderw=3:x=(w-tw)/2:y=h-80" \
-            -af "volume=0.05" \
-            -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac -shortest \
-            "$folder/_bienvenida_trexbites.mp4"
+        as_tv cp "$PLACEHOLDER" "$folder/_bienvenida_trexbites.mp4"
     fi
 done < <(python3 -I "$SRC_DIR/panel/trexbites_panel/channels.py" --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-dirs)
 
@@ -173,6 +187,11 @@ chown -R "$TV_USER:$TV_USER" "$TV_HOME"
 install -d -o "$TV_USER" -g "$TV_USER" "$TV_HOME/.config/systemd/user/trexbites-x11.target.wants"
 ln -sfn ../fs42.service "$TV_HOME/.config/systemd/user/trexbites-x11.target.wants/fs42.service"
 chown -h "$TV_USER:$TV_USER" "$TV_HOME/.config/systemd/user/trexbites-x11.target.wants/fs42.service"
+
+# keep the tv user's services manager running even before the screen session
+# starts, so the panel can always switch between the TV and "¡A dormir!"
+mkdir -p /var/lib/systemd/linger
+touch "/var/lib/systemd/linger/$TV_USER"
 
 # never sleep: it's a TV
 systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target

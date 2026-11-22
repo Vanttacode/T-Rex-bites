@@ -1,35 +1,7 @@
-import importlib
-import json
-import shutil
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
-REPO = Path(__file__).resolve().parents[2]
-DEFAULT_CONFS = REPO / "system" / "defaults" / "confs"
-
-
-@pytest.fixture
-def env(tmp_path, monkeypatch):
-    fs42 = tmp_path / "fs42"
-    shutil.copytree(DEFAULT_CONFS, fs42 / "confs")
-    (fs42 / "confs" / "main_config.json").write_text(json.dumps({"api_key": "k" * 20}))
-    (fs42 / "catalog").mkdir()
-    monkeypatch.setenv("TREXBITES_FS42_DIR", str(fs42))
-    monkeypatch.setenv("TREXBITES_STATE", str(tmp_path / "state" / "panel.json"))
-    monkeypatch.setenv("TREXBITES_FS42_URL", "http://127.0.0.1:9")
-
-    from trexbites_panel import app as app_module
-    app_module = importlib.reload(app_module)
-    rebuilds = []
-    app_module.app.state.fs42.schedule_rebuild = rebuilds.append
-    client = TestClient(app_module.app)
-    return {"client": client, "fs42": fs42, "rebuilds": rebuilds, "module": app_module}
-
-
-def login(client, pin="1234"):
-    return client.post("/api/login", json={"pin": pin})
+from conftest import login
 
 
 def test_index_is_public(env):
@@ -94,7 +66,7 @@ def test_upload_lands_in_tag_folder_and_triggers_rebuild(env):
     assert resp.status_code == 200, resp.text
     target = env["fs42"] / "catalog" / "trex_tv" / "dibujos" / "Capitulo 1.mp4"
     assert target.read_bytes() == b"fake-video"
-    assert env["rebuilds"] == ["TRexTV"]
+    assert env["rebuilds"] == [("TRexTV", False)]
 
     # same name again gets a new name instead of overwriting
     resp = c.post("/api/upload", data={"channel": "TRexTV", "tag": "dibujos"},
