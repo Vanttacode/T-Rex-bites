@@ -280,7 +280,8 @@ chown -R "$TV_USER:$TV_USER" "$TV_HOME"
 if [ ! -f "$FS42_DIR/osd/osd.json" ]; then
     install -o "$TV_USER" -g "$TV_USER" -m 644 "$SRC_DIR/system/defaults/osd.json" "$FS42_DIR/osd/osd.json"
 fi
-install -m 644 "$SRC_DIR/panel/static/icon-512.png" "$PREFIX/media/logo_trexbites.png"
+# transparent background, so only the logo shows over the video
+install -m 644 "$SRC_DIR/panel/static/logo-trexbites.png" "$PREFIX/media/logo_trexbites.png"
 install -d -o "$TV_USER" -g "$TV_USER" "$TV_HOME/.config/systemd/user/fs42.service.wants"
 ln -sfn ../fs42-osd.service "$TV_HOME/.config/systemd/user/fs42.service.wants/fs42-osd.service"
 chown -h "$TV_USER:$TV_USER" "$TV_HOME/.config/systemd/user/fs42.service.wants/fs42-osd.service"

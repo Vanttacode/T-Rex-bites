@@ -19,6 +19,9 @@ xserver-xorg-input-all
 xinit
 x11-xserver-utils
 libxcb-cursor0
+# the channel logo (Qt overlay) does not start without these two
+libxcb-icccm4
+libxcb-keysyms1
 libgl1
 libegl1
 libxkbcommon-x11-0

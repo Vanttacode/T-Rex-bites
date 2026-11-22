@@ -68,6 +68,7 @@ class WifiManager:
         self.last_connected = None  # name of the home network that worked last
         self.connecting = False
         self.needs_setup = False    # True: show the setup screen instead of the TV
+        self.hotspot_error = None   # why the setup network could not open, if it failed
         self.status_cache = {}
         self._offline_since = None
         self._hotspot_since = None
@@ -166,7 +167,9 @@ class WifiManager:
                     "ipv6.method", "ignore")
         result = self.nm("connection", "up", HOTSPOT_CON, timeout=40)
         if result.returncode != 0:
-            log.warning("could not start the setup network: %s", result.stderr.strip())
+            # usually a WiFi chip that can't act as an access point
+            self.hotspot_error = result.stderr.strip() or "nmcli connection up failed"
+            log.warning("could not start the setup network: %s", self.hotspot_error)
         else:
             log.info("setup network %r is on", HOTSPOT_SSID)
 
@@ -253,11 +256,12 @@ class WifiManager:
             return
 
         self._hotspot_since = None
-        self.needs_setup = False
         grace = OFFLINE_GRACE if saved else FIRST_SETUP_GRACE
+        # never configured and still offline: show the setup screen even if the
+        # setup network fails to open, so the TV never sits on a black screen
+        self.needs_setup = not saved and now - self._offline_since >= grace
         if now - self._offline_since >= grace:
             self.start_hotspot(self.wifi_device())
             self.status_cache = self.status()
             if self.status_cache.get("hotspot"):
                 self._hotspot_since = now
-                self.needs_setup = not saved

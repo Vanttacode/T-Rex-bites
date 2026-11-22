@@ -604,7 +604,8 @@ class WifiConnectBody(BaseModel):
 def _wifi_info(app_):
     wifi = app_.state.wifi
     return {**wifi.status_cache, "networks": wifi.networks, "connecting": wifi.connecting,
-            "last_error": wifi.last_error, "needs_setup": wifi.needs_setup}
+            "last_error": wifi.last_error, "needs_setup": wifi.needs_setup,
+            "hotspot_error": wifi.hotspot_error}
 
 
 @app.get("/api/wifi", dependencies=[Depends(require_session)])
@@ -660,7 +661,7 @@ def _logo_conf(name):
 async def get_logo(name: str):
     path = channels.logo_file(_logo_conf(name), FS42_DIR)
     if path is None:
-        path = STATIC_DIR / "icon-512.png"  # the T-Rex Bites logo shown by default
+        path = STATIC_DIR / "logo-trexbites.png"  # the T-Rex Bites logo shown by default
     return FileResponse(path, headers={"Cache-Control": "no-cache"})
 
 
