@@ -1,0 +1,4 @@
+[Unit]
+Description=T-Rex Bites - sesión de pantalla
+BindsTo=graphical-session.target
+Wants=fs42.service

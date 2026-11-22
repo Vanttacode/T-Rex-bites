@@ -1,0 +1,18 @@
+# Finishes the T-Rex Bites setup on the first boot if it could not finish
+# during installation (for example, the network was not ready yet).
+[Unit]
+Description=T-Rex Bites - terminar instalación
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/trexbites/installed
+ConditionPathExists=/opt/trexbites-installer/system/install-trexbites.sh
+
+[Service]
+Type=oneshot
+ExecStart=/opt/trexbites-installer/system/install-trexbites.sh
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=multi-user.target

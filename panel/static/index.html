@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>T-Rex Bites</title>
+  <meta name="theme-color" content="#1b1f3b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="T-Rex Bites">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <img src="/static/icon.svg" alt="" class="logo">
+    <div>
+      <h1>T-Rex Bites</h1>
+      <p class="tagline">Tu canal de tele en casa</p>
+    </div>
+    <span id="onair" class="onair" hidden>● EN EL AIRE</span>
+    <span id="sleeping" class="sleeping" hidden>😴 DURMIENDO</span>
+  </header>
+
+  <!-- PIN -->
+  <section id="view-login" class="view" hidden>
+    <div class="card center">
+      <h2>Ingresa el PIN</h2>
+      <p class="muted">El PIN de fábrica es <b>1234</b>. Te pediremos cambiarlo.</p>
+      <div class="pin-dots" id="pin-dots"><span></span><span></span><span></span><span></span></div>
+      <div class="keypad" id="keypad"></div>
+      <p class="error" id="login-error" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- App -->
+  <main id="view-app" hidden>
+    <!-- Control -->
+    <section id="tab-remote" class="tab">
+      <div class="card">
+        <div class="now" id="now-playing">Conectando con la tele…</div>
+      </div>
+      <div class="remote">
+        <button class="rbtn big" data-remote="up" aria-label="Canal siguiente">CH ▲</button>
+        <button class="rbtn big" data-remote="volume_up" aria-label="Subir volumen">VOL ＋</button>
+        <button class="rbtn big" data-remote="down" aria-label="Canal anterior">CH ▼</button>
+        <button class="rbtn big" data-remote="volume_down" aria-label="Bajar volumen">VOL －</button>
+        <button class="rbtn" data-remote="guide">📺 Guía</button>
+        <button class="rbtn" data-remote="mute">🔇 Silencio</button>
+      </div>
+      <h3 class="section-title">Canales</h3>
+      <div class="channel-list" id="channel-buttons"></div>
+    </section>
+
+    <!-- Upload -->
+    <section id="tab-upload" class="tab" hidden>
+      <div class="card">
+        <h2>Subir programas</h2>
+        <label class="field">Canal
+          <select id="up-channel"></select>
+        </label>
+        <label class="field">Categoría
+          <select id="up-tag"></select>
+        </label>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="up-files" accept="video/*,.mkv,.avi,.mpg,.ts" multiple>
+          <span>📼 Toca aquí o arrastra videos</span>
+        </label>
+        <p class="muted" id="disk-info"></p>
+      </div>
+      <ul class="uploads" id="upload-list"></ul>
+    </section>
+
+    <!-- Library -->
+    <section id="tab-library" class="tab" hidden>
+      <div id="library"></div>
+    </section>
+
+    <!-- Schedule + bedtime -->
+    <section id="tab-schedule" class="tab" hidden>
+      <div class="card" id="bedtime-card">
+        <h2>🌙 Hora de dormir</h2>
+        <p class="power-line" id="power-line">…</p>
+        <div class="btn-row" id="power-buttons"></div>
+        <details id="bedtime-details">
+          <summary>Configurar horario de dormir</summary>
+          <label class="switch"><input type="checkbox" id="bt-enabled"> Apagar la tele automáticamente</label>
+          <div class="time-grid">
+            <label>Se duerme <small>dom a jue</small><input type="time" id="bt-sleep_school"></label>
+            <label>Se duerme <small>vie y sáb</small><input type="time" id="bt-sleep_weekend"></label>
+            <label>Despierta <small>lun a vie</small><input type="time" id="bt-wake_school"></label>
+            <label>Despierta <small>sáb y dom</small><input type="time" id="bt-wake_weekend"></label>
+          </div>
+          <button class="btn" id="bt-save">Guardar hora de dormir</button>
+          <p class="error" id="bt-msg" role="status"></p>
+        </details>
+      </div>
+
+      <div class="card">
+        <h2>🗓 Programación</h2>
+        <div id="sched-empty" class="muted" hidden>No hay canales con horario. Crea uno en <b>Más → Canales</b>.</div>
+        <div id="sched-editor">
+          <label class="field">Canal <select id="sched-channel"></select></label>
+          <div class="days" id="sched-days" role="tablist"></div>
+          <p class="muted small">1. Elige un pincel · 2. Toca o arrastra sobre las horas</p>
+          <div class="palette" id="sched-palette"></div>
+          <div class="hours" id="sched-hours"></div>
+          <div class="copy-row">
+            <span class="muted small">Copiar este día a:</span>
+            <button class="chip" data-copy="weekdays">Lun–Vie</button>
+            <button class="chip" data-copy="weekend">Sáb–Dom</button>
+            <button class="chip" data-copy="all">Todos</button>
+          </div>
+        </div>
+      </div>
+      <div class="savebar" id="sched-savebar" hidden>
+        <span>Cambios sin guardar</span>
+        <button class="btn ghost" id="sched-discard">Descartar</button>
+        <button class="btn" id="sched-save">Guardar</button>
+      </div>
+    </section>
+
+    <!-- More -->
+    <section id="tab-more" class="tab" hidden>
+      <div class="card" id="wifi-card">
+        <div class="card-head">
+          <h2>📶 WiFi</h2>
+          <button class="btn small ghost" id="wifi-scan">Buscar redes</button>
+        </div>
+        <p class="power-line" id="wifi-status">…</p>
+        <p class="error" id="wifi-error" role="alert"></p>
+        <div id="wifi-list" class="wifi-list"></div>
+        <div id="wifi-form" hidden>
+          <label class="field">Red <input type="text" id="wifi-ssid" maxlength="32" autocomplete="off"></label>
+          <label class="field">Clave del WiFi <input type="password" id="wifi-pass" maxlength="63" autocomplete="off"></label>
+          <label class="switch"><input type="checkbox" id="wifi-show"> Mostrar clave</label>
+          <div class="btn-row">
+            <button class="btn" id="wifi-connect">Conectar</button>
+            <button class="btn ghost" id="wifi-cancel">Cancelar</button>
+          </div>
+        </div>
+        <button class="btn small ghost" id="wifi-other">Otra red (oculta)</button>
+        <div class="warning" id="wifi-after" hidden></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>📺 Canales</h2>
+          <button class="btn small" id="ch-new">＋ Nuevo</button>
+        </div>
+        <div id="ch-list"></div>
+      </div>
+
+      <div class="card" id="ch-editor" hidden>
+        <h2 id="ch-editor-title">Nuevo canal</h2>
+        <label class="field">Nombre <input type="text" id="ch-name" maxlength="30" placeholder="Ej: Canal Películas"></label>
+        <label class="field">Número <input type="number" id="ch-number" min="1" max="99" inputmode="numeric"></label>
+        <fieldset class="field" id="ch-type-field">
+          <legend>Tipo</legend>
+          <label class="radio"><input type="radio" name="ch-type" value="standard" checked> 🗓 Con horario <small>(categorías por hora y fin de transmisión)</small></label>
+          <label class="radio"><input type="radio" name="ch-type" value="loop"> 🔁 Todo el día <small>(repite sus videos sin parar)</small></label>
+        </fieldset>
+        <div class="field" id="ch-cats-field">
+          Categorías
+          <ul class="cat-list" id="ch-cats"></ul>
+          <div class="add-cat">
+            <input type="text" id="ch-cat-new" maxlength="30" placeholder="Nueva categoría (ej: Cuentos)">
+            <button class="btn small ghost" id="ch-cat-add">Agregar</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="ch-save">Guardar canal</button>
+          <button class="btn ghost" id="ch-cancel">Cancelar</button>
+        </div>
+        <button class="btn danger wide" id="ch-delete" hidden>Borrar este canal</button>
+        <p class="error" id="ch-msg" role="status"></p>
+      </div>
+
+      <div class="card">
+        <h2>📊 Qué se vio</h2>
+        <p class="muted small">Lo que pasó la tele cada día (minutos en pantalla).</p>
+        <div id="history"></div>
+      </div>
+
+      <div class="card" id="pin-card">
+        <h2>🔒 Cambiar PIN</h2>
+        <p class="warning" id="pin-default-warning" hidden>Todavía usas el PIN de fábrica (1234). Cámbialo para que nadie más pueda cambiar la programación.</p>
+        <label class="field">PIN actual <input type="password" inputmode="numeric" id="pin-current" autocomplete="current-password"></label>
+        <label class="field">PIN nuevo (4 a 8 números) <input type="password" inputmode="numeric" id="pin-new" autocomplete="new-password"></label>
+        <button class="btn" id="pin-save">Guardar PIN</button>
+        <p class="error" id="pin-msg" role="status"></p>
+      </div>
+      <div class="card">
+        <h2>🛠 Opciones avanzadas</h2>
+        <p class="muted">Para ajustes muy finos de los canales, usa la consola de FieldStation42.</p>
+        <a class="btn ghost" id="advanced-link" href="#" target="_blank" rel="noopener">Abrir consola avanzada</a>
+      </div>
+      <div class="card">
+        <button class="btn ghost" id="logout">Cerrar sesión en este aparato</button>
+      </div>
+    </section>
+
+    <nav class="tabbar">
+      <button data-tab="remote" class="active">🎮<span>Control</span></button>
+      <button data-tab="upload">📤<span>Subir</span></button>
+      <button data-tab="library">📚<span>Programas</span></button>
+      <button data-tab="schedule">🗓<span>Horarios</span></button>
+      <button data-tab="more">☰<span>Más</span></button>
+    </nav>
+  </main>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="/static/app.js"></script>
+  <script src="/static/manage.js"></script>
+  <script src="/static/wifi.js"></script>
+</body>
+</html>

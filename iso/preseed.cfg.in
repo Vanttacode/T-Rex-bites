@@ -1,0 +1,64 @@
+#### T-Rex Bites: answers for the Debian installer, so it installs with no questions.
+#### build-iso.sh fills in the @...@ values.
+
+# Language, country and keyboard
+d-i debian-installer/locale string @LOCALE@
+d-i keyboard-configuration/xkb-keymap select @KEYMAP@
+
+# Network and Debian mirror (filled in by build-iso.sh: none for the offline USB)
+@NETWORK_LINES@
+
+# Accounts: no root password; "tv" can use sudo for maintenance
+d-i passwd/root-login boolean false
+d-i passwd/user-fullname string T-Rex Bites
+d-i passwd/username string tv
+d-i passwd/user-password password @TV_PASSWORD@
+d-i passwd/user-password-again password @TV_PASSWORD@
+d-i user-setup/allow-password-weak boolean true
+
+# Clock
+d-i clock-setup/utc boolean true
+d-i time/zone string @TIMEZONE@
+
+# Disk: use the whole first disk, no questions.
+# The boot menu already asked the person to confirm erasing it.
+d-i partman-auto/method string regular
+d-i partman-auto/choose_recipe select atomic
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+d-i partman-efi/non_efi_system boolean true
+
+# Packages: minimal system; T-Rex Bites adds the rest from the USB or the internet
+d-i apt-setup/non-free-firmware boolean true
+d-i apt-setup/non-free boolean false
+d-i apt-setup/contrib boolean false
+d-i apt-setup/cdrom/set-first boolean false
+d-i apt-setup/disable-cdrom-entries boolean true
+tasksel tasksel/first multiselect
+popularity-contest popularity-contest/participate boolean false
+@PACKAGE_LINES@
+
+# Boot loader
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean false
+d-i grub-installer/bootdev string default
+
+# Install T-Rex Bites itself. If anything fails here (for example a slow
+# network), trexbites-firstboot.service finishes the job on the first boot.
+d-i preseed/late_command string \
+    mkdir -p /target/opt/trexbites-installer; \
+    cp -r /cdrom/trexbites/payload/. /target/opt/trexbites-installer/; \
+    chmod +x /target/opt/trexbites-installer/system/install-trexbites.sh; \
+    cp /target/opt/trexbites-installer/system/rootfs/etc/systemd/system/trexbites-firstboot.service /target/etc/systemd/system/; \
+    in-target systemctl enable trexbites-firstboot.service; \
+    in-target /opt/trexbites-installer/system/install-trexbites.sh || true
+
+# Reboot when done, without asking
+d-i finish-install/reboot_in_progress note
+d-i cdrom-detect/eject boolean true

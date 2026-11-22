@@ -1,0 +1,345 @@
+{
+  "station_conf": {
+    "network_name": "TRexTV",
+    "network_long_name": "T-Rex TV",
+    "channel_number": 3,
+    "network_type": "standard",
+    "schedule_increment": 30,
+    "commercial_free": true,
+    "fallback_tag": "dibujos",
+    "bump_dir": "bumps",
+    "content_dir": "catalog/trex_tv",
+    "sign_off_video": "runtime/signoff.mp4",
+    "off_air_video": "runtime/off_air_pattern.mp4",
+    "standby_image": "runtime/standby.png",
+    "be_right_back_media": "runtime/brb.png",
+    "monday": {
+      "7": {
+        "tags": "manana"
+      },
+      "8": {
+        "tags": "manana"
+      },
+      "9": {
+        "tags": "manana"
+      },
+      "10": {
+        "tags": "dibujos"
+      },
+      "11": {
+        "tags": "dibujos"
+      },
+      "12": {
+        "tags": "dibujos"
+      },
+      "13": {
+        "tags": "educativo"
+      },
+      "14": {
+        "tags": "educativo"
+      },
+      "15": {
+        "tags": "dibujos"
+      },
+      "16": {
+        "tags": "dibujos"
+      },
+      "17": {
+        "tags": "dibujos"
+      },
+      "18": {
+        "tags": "peliculas"
+      },
+      "19": {
+        "tags": "dibujos"
+      },
+      "20": {
+        "event": "signoff"
+      }
+    },
+    "tuesday": {
+      "7": {
+        "tags": "manana"
+      },
+      "8": {
+        "tags": "manana"
+      },
+      "9": {
+        "tags": "manana"
+      },
+      "10": {
+        "tags": "dibujos"
+      },
+      "11": {
+        "tags": "dibujos"
+      },
+      "12": {
+        "tags": "dibujos"
+      },
+      "13": {
+        "tags": "educativo"
+      },
+      "14": {
+        "tags": "educativo"
+      },
+      "15": {
+        "tags": "dibujos"
+      },
+      "16": {
+        "tags": "dibujos"
+      },
+      "17": {
+        "tags": "dibujos"
+      },
+      "18": {
+        "tags": "peliculas"
+      },
+      "19": {
+        "tags": "dibujos"
+      },
+      "20": {
+        "event": "signoff"
+      }
+    },
+    "wednesday": {
+      "7": {
+        "tags": "manana"
+      },
+      "8": {
+        "tags": "manana"
+      },
+      "9": {
+        "tags": "manana"
+      },
+      "10": {
+        "tags": "dibujos"
+      },
+      "11": {
+        "tags": "dibujos"
+      },
+      "12": {
+        "tags": "dibujos"
+      },
+      "13": {
+        "tags": "educativo"
+      },
+      "14": {
+        "tags": "educativo"
+      },
+      "15": {
+        "tags": "dibujos"
+      },
+      "16": {
+        "tags": "dibujos"
+      },
+      "17": {
+        "tags": "dibujos"
+      },
+      "18": {
+        "tags": "peliculas"
+      },
+      "19": {
+        "tags": "dibujos"
+      },
+      "20": {
+        "event": "signoff"
+      }
+    },
+    "thursday": {
+      "7": {
+        "tags": "manana"
+      },
+      "8": {
+        "tags": "manana"
+      },
+      "9": {
+        "tags": "manana"
+      },
+      "10": {
+        "tags": "dibujos"
+      },
+      "11": {
+        "tags": "dibujos"
+      },
+      "12": {
+        "tags": "dibujos"
+      },
+      "13": {
+        "tags": "educativo"
+      },
+      "14": {
+        "tags": "educativo"
+      },
+      "15": {
+        "tags": "dibujos"
+      },
+      "16": {
+        "tags": "dibujos"
+      },
+      "17": {
+        "tags": "dibujos"
+      },
+      "18": {
+        "tags": "peliculas"
+      },
+      "19": {
+        "tags": "dibujos"
+      },
+      "20": {
+        "event": "signoff"
+      }
+    },
+    "friday": {
+      "7": {
+        "tags": "manana"
+      },
+      "8": {
+        "tags": "manana"
+      },
+      "9": {
+        "tags": "manana"
+      },
+      "10": {
+        "tags": "dibujos"
+      },
+      "11": {
+        "tags": "dibujos"
+      },
+      "12": {
+        "tags": "dibujos"
+      },
+      "13": {
+        "tags": "educativo"
+      },
+      "14": {
+        "tags": "educativo"
+      },
+      "15": {
+        "tags": "dibujos"
+      },
+      "16": {
+        "tags": "dibujos"
+      },
+      "17": {
+        "tags": "dibujos"
+      },
+      "18": {
+        "tags": "peliculas"
+      },
+      "19": {
+        "tags": "dibujos"
+      },
+      "20": {
+        "event": "signoff"
+      }
+    },
+    "saturday": {
+      "7": {
+        "tags": "manana"
+      },
+      "8": {
+        "tags": "manana"
+      },
+      "9": {
+        "tags": "manana"
+      },
+      "10": {
+        "tags": "dibujos"
+      },
+      "11": {
+        "tags": "dibujos"
+      },
+      "12": {
+        "tags": "dibujos"
+      },
+      "13": {
+        "tags": "educativo"
+      },
+      "14": {
+        "tags": "educativo"
+      },
+      "15": {
+        "tags": "peliculas"
+      },
+      "16": {
+        "tags": "dibujos"
+      },
+      "17": {
+        "tags": "dibujos"
+      },
+      "18": {
+        "tags": "peliculas"
+      },
+      "19": {
+        "tags": "dibujos"
+      },
+      "20": {
+        "event": "signoff"
+      }
+    },
+    "sunday": {
+      "7": {
+        "tags": "manana"
+      },
+      "8": {
+        "tags": "manana"
+      },
+      "9": {
+        "tags": "manana"
+      },
+      "10": {
+        "tags": "dibujos"
+      },
+      "11": {
+        "tags": "dibujos"
+      },
+      "12": {
+        "tags": "dibujos"
+      },
+      "13": {
+        "tags": "educativo"
+      },
+      "14": {
+        "tags": "educativo"
+      },
+      "15": {
+        "tags": "peliculas"
+      },
+      "16": {
+        "tags": "dibujos"
+      },
+      "17": {
+        "tags": "dibujos"
+      },
+      "18": {
+        "tags": "peliculas"
+      },
+      "19": {
+        "tags": "dibujos"
+      },
+      "20": {
+        "event": "signoff"
+      }
+    },
+    "trexbites": {
+      "categories": [
+        {
+          "tag": "manana",
+          "label": "Mañana"
+        },
+        {
+          "tag": "dibujos",
+          "label": "Dibujos animados"
+        },
+        {
+          "tag": "educativo",
+          "label": "Educativos"
+        },
+        {
+          "tag": "peliculas",
+          "label": "Películas"
+        }
+      ]
+    }
+  }
+}

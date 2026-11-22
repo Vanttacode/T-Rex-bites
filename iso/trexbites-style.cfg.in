@@ -1,0 +1,6 @@
+menu background splash.png
+menu color title 1;37;44 #ffffffff #00000000 std
+menu color sel 7;37;40 #ff1b1f3b #ffff8a1f all
+menu color unsel 37;44 #ffffffff #00000000 std
+menu color help 37;40 #ffffffff #00000000 std
+menu tabmsg

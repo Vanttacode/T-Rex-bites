@@ -1,0 +1,5 @@
+# Only for installs that download Python libraries from the internet:
+# some of them (evdev) are compiled during installation.
+# The offline USB ships them already compiled.
+python3-dev
+build-essential

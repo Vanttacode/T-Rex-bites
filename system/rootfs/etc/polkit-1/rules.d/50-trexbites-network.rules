@@ -1,0 +1,7 @@
+// T-Rex Bites: the panel runs as the "tv" user and sets up WiFi from the
+// phone (list networks, save the home network, open the setup network).
+polkit.addRule(function (action, subject) {
+    if (subject.user == "tv" && action.id.indexOf("org.freedesktop.NetworkManager.") == 0) {
+        return polkit.Result.YES;
+    }
+});
