@@ -1,4 +1,6 @@
+import json
 import subprocess
+import time
 
 import pytest
 
@@ -209,3 +211,45 @@ def test_captive_portal_redirects_unknown_pages(env):
     assert c.get("/hotspot-detect.html", follow_redirects=False).headers["location"] == "/"
     # API errors stay JSON
     assert c.get("/api/nope").status_code == 404
+
+
+def test_failed_setup_network_backs_off_and_still_shows_setup_screen(tmp_path):
+    nm, clock = FakeNM(), Clock()
+
+    def no_ap(args, **kwargs):
+        result = nm(args, **kwargs)
+        if args[1:4] == ["connection", "up", HOTSPOT_CON]:
+            nm.active = None
+            return subprocess.CompletedProcess(args, 10, "", "Error: AP mode not supported")
+        return result
+
+    w = WifiManager(runner=no_ap, clock=clock, state_dir=tmp_path)
+    w.tick()
+    clock.now = 25
+    w.tick()
+    assert "AP mode" in w.hotspot_error
+    assert w.needs_setup is True  # the keyboard setup screen shows anyway
+    shared = json.loads((tmp_path / "wifi-status.json").read_text())
+    assert shared["hotspot"] is False and "AP mode" in shared["hotspot_error"]
+    assert [n["ssid"] for n in shared["networks"]] == ["CasaPerez", "Vecino:5G"]
+
+    attempts = len([c for c in nm.calls if c[:2] == ["connection", "up"]])
+    clock.now = 100
+    w.tick()
+    assert len([c for c in nm.calls if c[:2] == ["connection", "up"]]) == attempts  # waiting
+    clock.now = 25 + wifi_module.HOTSPOT_RETRY_AFTER + 1
+    w.tick()
+    assert len([c for c in nm.calls if c[:2] == ["connection", "up"]]) == attempts + 1
+
+
+def test_setup_network_waits_while_screen_is_busy(tmp_path):
+    nm, clock = FakeNM(), Clock()
+    w = WifiManager(runner=nm, clock=clock, state_dir=tmp_path)
+    (tmp_path / "wifi-busy").write_text(str(time.time()))
+    w.tick()
+    clock.now = 25
+    w.tick()
+    assert nm.active is None  # the person is typing on the TV: leave the card alone
+    (tmp_path / "wifi-busy").unlink()
+    w.tick()
+    assert nm.active == HOTSPOT_CON

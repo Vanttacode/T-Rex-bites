@@ -130,7 +130,7 @@ app.state.panel = PanelState(STATE_PATH)
 app.state.fs42 = FS42Client(FS42_URL, FS42_DIR)
 app.state.history = History(HISTORY_PATH)
 app.state.tv_power = bedtime.TVPower()
-app.state.wifi = WifiManager()
+app.state.wifi = WifiManager(state_dir=STATE_PATH.parent)
 app.state.updates = updates.UpdateChecker()
 app.state.power = {"state": "on", "reason": None, "until": None}
 _login_failures = defaultdict(deque)

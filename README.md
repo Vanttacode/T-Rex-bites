@@ -75,7 +75,10 @@ Pasos para un computador dedicado:
    presionar **F12**, **F9**, **F2**, **Esc** o **Novo** (Lenovo) al encenderlo.
 3. Elige **Instalar T-Rex Bites** y luego **Sí, borrar el disco e instalar**.
 4. Espera unos 15 a 30 minutos. El computador se reinicia solo y aparece la tele.
-5. **Configura el WiFi desde el teléfono** (no hace falta tocar el router):
+5. **Configura el WiFi.** La tele muestra *"Configura el WiFi de T-Rex Bites"* con tres formas:
+   - **Con el teclado del computador:** elige tu red con las flechas, escribe la clave y Enter.
+   - **Con cable de red:** se conecta solo.
+   - **Con el teléfono** (si la tarjeta WiFi del computador puede crear su propia red):
    - La tele muestra *"Configura el WiFi de T-Rex Bites"*.
    - En tu teléfono, conéctate a la red WiFi **"T-Rex Bites Config"** (sin clave).
    - Se abre sola la página de configuración (si no, entra a `http://10.42.0.1`).
