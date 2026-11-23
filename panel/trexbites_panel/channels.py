@@ -213,23 +213,173 @@ def logo_settings(conf, fs42_dir):
     }
 
 
-def week_grid(conf):
-    """{day: {hour: tag | "signoff"}} with only the hours that are on air."""
-    grid = {}
+# Schedule blocks: what the timeline editor works with.
+#   {"start": 7, "end": 10, "kind": "show", "tags": ["dibujos"], "mode": "random"|"order",
+#    "breaks": null|"end"|"standard"|"center", "min_minutes": null|int, "max_minutes": null|int}
+#   {"start": 20, "end": 21, "kind": "signoff"}
+# Hours are whole hours (0-24). In FieldStation42 a block is one slot per hour;
+# the hours after the first carry "continued": true so the block can be read back.
+MAX_BLOCK_MINUTES = 600
+
+
+def _slot_content(slot):
+    tags = slot.get("tags")
+    tags = [tags] if isinstance(tags, str) else [t for t in (tags or []) if isinstance(t, str)]
+
+    def minutes(key):
+        value = slot.get(key)
+        return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+    return {
+        "kind": "show",
+        "tags": tags,
+        "mode": "order" if slot.get("sequence") else "random",
+        "breaks": slot.get("break_strategy") if slot.get("break_strategy") in BREAK_STRATEGIES else None,
+        "min_minutes": minutes("min_duration"),
+        "max_minutes": minutes("max_duration"),
+    }
+
+
+def week_blocks(conf):
+    """{day: [block]} read from the station's weekly slots."""
+    week = {}
     for day in DAYS:
         slots = conf.get(day) if isinstance(conf.get(day), dict) else {}
-        day_grid = {}
-        for hour, slot in slots.items():
-            if not (str(hour).isdigit() and isinstance(slot, dict)):
+        blocks = []
+        for hour in range(24):
+            slot = slots.get(str(hour))
+            if not isinstance(slot, dict):
                 continue
             if slot.get("event") == SIGNOFF:
-                day_grid[str(int(hour))] = SIGNOFF
-            elif isinstance(slot.get("tags"), str):
-                day_grid[str(int(hour))] = slot["tags"]
-            elif isinstance(slot.get("tags"), list) and slot["tags"]:
-                day_grid[str(int(hour))] = slot["tags"][0]
-        grid[day] = day_grid
-    return grid
+                blocks.append({"start": hour, "end": hour + 1, "kind": SIGNOFF})
+                continue
+            prev = blocks[-1] if blocks else None
+            if "tags" not in slot:
+                # FieldStation42's own "continued" slot without tags
+                if slot.get("continued") and prev and prev["kind"] == "show" and prev["end"] == hour:
+                    prev["end"] = hour + 1
+                continue
+            content = _slot_content(slot)
+            if (slot.get("continued") and prev and prev["kind"] == "show" and prev["end"] == hour
+                    and all(prev[k] == content[k] for k in content)):
+                prev["end"] = hour + 1
+            else:
+                blocks.append({"start": hour, "end": hour + 1, **content})
+        week[day] = blocks
+    return week
+
+
+def sequence_name(tag):
+    """One episode order per category, shared by all its "in order" blocks."""
+    return f"orden-{tag}"
+
+
+def _clean_block(block, valid_tags):
+    if not isinstance(block, dict):
+        raise ChannelError("Bloque inválido.")
+    try:
+        start, end = int(block.get("start")), int(block.get("end"))
+    except (TypeError, ValueError):
+        raise ChannelError("Las horas de un bloque deben ser números.")
+    if not 0 <= start < end <= 24:
+        raise ChannelError("Un bloque debe empezar y terminar entre las 0 y las 24 horas.")
+    kind = block.get("kind")
+    if kind == SIGNOFF:
+        return {"start": start, "end": start + 1, "kind": SIGNOFF}
+    if kind != "show":
+        raise ChannelError("Tipo de bloque inválido.")
+    tags = block.get("tags")
+    if not isinstance(tags, list) or not tags:
+        raise ChannelError("Cada bloque necesita al menos una categoría.")
+    if len(set(tags)) != len(tags) or any(t not in valid_tags for t in tags):
+        raise ChannelError("Un bloque usa una categoría que no existe.")
+    mode = block.get("mode", "random")
+    if mode not in ("random", "order"):
+        raise ChannelError("Modo de bloque inválido.")
+    if mode == "order" and len(tags) != 1:
+        raise ChannelError("\"Capítulos en orden\" funciona con una sola categoría.")
+    breaks = block.get("breaks")
+    if breaks is not None and breaks not in BREAK_STRATEGIES:
+        raise ChannelError("Estilo de tanda inválido.")
+    limits = {}
+    for key in ("min_minutes", "max_minutes"):
+        value = block.get(key)
+        if value in (None, ""):
+            limits[key] = None
+            continue
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            raise ChannelError("La duración de los videos debe ser un número de minutos.")
+        if not 1 <= value <= MAX_BLOCK_MINUTES:
+            raise ChannelError("La duración de los videos debe estar entre 1 y 600 minutos.")
+        limits[key] = value
+    if limits["min_minutes"] and limits["max_minutes"] and limits["min_minutes"] > limits["max_minutes"]:
+        raise ChannelError("La duración mínima no puede ser mayor que la máxima.")
+    return {"start": start, "end": end, "kind": "show", "tags": list(tags), "mode": mode,
+            "breaks": breaks, **limits}
+
+
+def _block_slot(block):
+    tags = block["tags"]
+    slot = {"tags": tags[0] if len(tags) == 1 else list(tags)}
+    if len(tags) > 1:
+        slot["random_tags"] = True
+    if block["mode"] == "order":
+        slot["sequence"] = sequence_name(tags[0])
+    if block["breaks"]:
+        slot["break_strategy"] = block["breaks"]
+    if block["min_minutes"]:
+        slot["min_duration"] = block["min_minutes"]
+    if block["max_minutes"]:
+        slot["max_duration"] = block["max_minutes"]
+    return slot
+
+
+def set_blocks(conf, week):
+    """Replace a standard channel's weekly schedule with {day: [block]}."""
+    if conf.get("network_type", "standard") != "standard":
+        raise ChannelError("Este canal no usa horario: pasa sus videos todo el día.")
+    if not isinstance(week, dict):
+        raise ChannelError("Programación inválida.")
+    valid = {tag for tag, _ in channel_categories(conf)}
+    conf = copy.deepcopy(conf)
+    _remember_categories(conf)
+    _repair(conf)
+    for day in DAYS:
+        blocks = week.get(day) or []
+        if not isinstance(blocks, list):
+            raise ChannelError("Programación inválida.")
+        cleaned = sorted((_clean_block(b, valid) for b in blocks), key=lambda b: b["start"])
+        for before, after in zip(cleaned, cleaned[1:]):
+            if after["start"] < before["end"]:
+                raise ChannelError("Hay bloques que se superponen el mismo día.")
+        slots = {}
+        for block in cleaned:
+            if block["kind"] == SIGNOFF:
+                slots[str(block["start"])] = {"event": SIGNOFF}
+                continue
+            slot = _block_slot(block)
+            slots[str(block["start"])] = slot
+            for hour in range(block["start"] + 1, block["end"]):
+                slots[str(hour)] = {**slot, "continued": True}
+        conf[day] = dict(sorted(slots.items(), key=lambda kv: int(kv[0])))
+    return conf
+
+
+def duplicate_station_conf(conf, stations, long_name, number, share_videos):
+    """A copy of a channel: same categories, schedule, commercials and logo
+    settings. share_videos=True plays the same video folders; otherwise the
+    copy gets its own (empty) folders."""
+    new = copy.deepcopy(conf)
+    new["network_long_name"] = clean_label(long_name, "El nombre del canal")
+    new["channel_number"] = _clean_number(number, stations)
+    new["network_name"] = _unique_network_name(new["network_long_name"], stations)
+    if not share_videos:
+        new["content_dir"] = f"catalog/{slugify(new['network_name'])}"
+    new.pop("schedule_path", None)
+    new.pop("catalog_path", None)
+    return new
 
 
 def channel_summaries(confs_dir, fs42_dir):
@@ -246,7 +396,7 @@ def channel_summaries(confs_dir, fs42_dir):
             "number": conf.get("channel_number"),
             "type": ntype,
             "categories": [{"tag": t, "label": l} for t, l in channel_categories(conf)],
-            "schedule": week_grid(conf) if ntype == "standard" else None,
+            "blocks": week_blocks(conf) if ntype == "standard" else None,
             "ads": ads_settings(conf) if ntype == "standard" else None,
             "logo": logo_settings(conf, fs42_dir),
             "folders": [
@@ -311,8 +461,9 @@ def _unique_network_name(long_name, stations):
 
 
 def default_week(first_tag):
-    """New channels: on air 7:00-20:00 with their first category, then sign off."""
-    day = {str(h): {"tags": first_tag} for h in range(7, 20)}
+    """New channels: one block 7:00-20:00 with their first category, then sign off."""
+    day = {"7": {"tags": first_tag}}
+    day.update({str(h): {"tags": first_tag, "continued": True} for h in range(8, 20)})
     day["20"] = {"event": SIGNOFF}
     return {d: copy.deepcopy(day) for d in DAYS}
 
@@ -438,34 +589,6 @@ def update_station_conf(conf, stations, long_name, number, categories=None, ads=
         set_ads(conf, ads)
     if logo is not None:
         set_logo(conf, logo)
-    return conf
-
-
-def set_week(conf, week):
-    """Replace a standard channel's weekly schedule with week = {day: {hour: tag|"signoff"}}."""
-    if conf.get("network_type", "standard") != "standard":
-        raise ChannelError("Este canal no usa horario: pasa sus videos todo el día.")
-    if not isinstance(week, dict):
-        raise ChannelError("Horario inválido.")
-    valid = {tag for tag, _ in channel_categories(conf)}
-    conf = copy.deepcopy(conf)
-    _remember_categories(conf)
-    _repair(conf)
-    for day in DAYS:
-        slots = week.get(day) or {}
-        if not isinstance(slots, dict):
-            raise ChannelError("Horario inválido.")
-        new_day = {}
-        for hour, value in slots.items():
-            if not str(hour).isdigit() or not 0 <= int(hour) <= 23:
-                raise ChannelError("Hora inválida en el horario.")
-            if value == SIGNOFF:
-                new_day[str(int(hour))] = {"event": SIGNOFF}
-            elif value in valid:
-                new_day[str(int(hour))] = {"tags": value}
-            else:
-                raise ChannelError("El horario usa una categoría que no existe.")
-        conf[day] = dict(sorted(new_day.items(), key=lambda kv: int(kv[0])))
     return conf
 
 

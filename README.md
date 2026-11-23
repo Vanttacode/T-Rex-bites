@@ -103,7 +103,21 @@ Para tenerlo como app en el teléfono, en el navegador usa
 | 🎮 **Control** | Control remoto: canal, volumen, guía y botones directos a cada canal |
 | 📤 **Subir** | Subir videos a un canal y categoría (con barra de progreso) |
 | 📚 **Programas** | Ver y borrar los videos de cada canal |
-| 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y **grilla semanal** de cada canal: eliges un pincel (categoría, fin de transmisión o apagado) y tocas las horas |
+| 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y acceso al editor de programación |
+
+### Editor de programación (en el computador)
+
+Abre **http://trexbites.local/programacion** desde un computador en tu WiFi:
+una **línea de tiempo semanal** (días en filas, horas en columnas) donde cada
+programa es un bloque de color.
+
+- **Crear:** eliges un contenido en la paleta y arrastras sobre la línea de tiempo.
+- **Mover / alargar:** arrastras el bloque (también a otro día) o sus bordes.
+- **Cada bloque:** una o varias categorías (🎲 mezcla al azar), 🔁 capítulos en
+  orden (sigue donde quedó), duración de los videos (cortos, episodios, películas)
+  y estilo de la tanda de comerciales.
+- **Herramientas:** copiar un día a otros, programación al azar, duplicar el canal
+  (con los mismos videos o con videos propios), deshacer/rehacer y guardar (Ctrl+S).
 | ☰ **Más** | **WiFi**, **canales** (categorías, **comerciales** y **logo**), **actualizaciones**, **qué se vio** cada día, PIN y opciones avanzadas |
 
 ---

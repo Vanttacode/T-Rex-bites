@@ -85,159 +85,13 @@ async function setPower(mode) {
   } catch (e) { toast(e.message); }
 }
 
-// ---------- weekly schedule ----------
+// ---------- schedule tab ----------
+// The timeline editor lives in /programacion (made for a computer); on the
+// phone this tab keeps bedtime and a link to it.
 
-const sched = { channel: null, week: null, day: "monday", brush: null, dirty: false, painting: false };
-
-function scheduledChannels() {
-  return channelsCache.filter((c) => c.type === "standard" && c.schedule);
-}
-
-function colorOf(channel, value) {
-  if (value === SIGNOFF) return "#4b4f7a";
-  const i = channel.categories.findIndex((c) => c.tag === value);
-  return i >= 0 ? CATEGORY_COLORS[i % CATEGORY_COLORS.length] : "#2a2f5c";
-}
-
-function labelOf(channel, value) {
-  if (value === SIGNOFF) return "🌙 Fin de transmisión";
-  if (!value) return "Apagado";
-  const cat = channel.categories.find((c) => c.tag === value);
-  return cat ? cat.label : value;
-}
-
-function setDirty(dirty) {
-  sched.dirty = dirty;
-  $("sched-savebar").hidden = !dirty;
-}
-
-async function openScheduleTab() {
+function openScheduleTab() {
   loadBedtime();
-  if (sched.dirty) return; // keep unsaved edits when coming back to the tab
-  try { await loadChannels(); } catch (e) { toast(e.message); return; }
-  const list = scheduledChannels();
-  $("sched-empty").hidden = list.length > 0;
-  $("sched-editor").hidden = list.length === 0;
-  if (!list.length) return;
-  const sel = $("sched-channel");
-  const keep = sched.channel && list.some((c) => c.name === sched.channel.name) ? sched.channel.name : list[0].name;
-  sel.replaceChildren(...list.map((c) => el("option", { value: c.name }, `${c.number} · ${c.long_name}`)));
-  sel.value = keep;
-  selectScheduleChannel(keep);
-}
-
-function selectScheduleChannel(name) {
-  const channel = scheduledChannels().find((c) => c.name === name);
-  sched.channel = channel;
-  sched.week = JSON.parse(JSON.stringify(channel.schedule));
-  sched.brush = channel.categories.length ? channel.categories[0].tag : SIGNOFF;
-  setDirty(false);
-  renderSchedule();
-}
-
-function renderSchedule() {
-  const ch = sched.channel;
-  $("sched-days").replaceChildren(...DAYS.map(([key, short, long]) => el("button", {
-    class: key === sched.day ? "active" : "", role: "tab", "aria-label": long,
-    onclick: () => { sched.day = key; renderSchedule(); },
-  }, short)));
-
-  const brushes = [...ch.categories.map((c) => c.tag), SIGNOFF, OFF];
-  $("sched-palette").replaceChildren(...brushes.map((value) => {
-    const b = el("button", {
-      class: "brush" + (value === sched.brush ? " active" : ""),
-      onclick: () => { sched.brush = value; renderSchedule(); },
-    }, value === OFF ? "⬛ Apagado" : labelOf(ch, value));
-    b.style.background = value === OFF ? "#15183a" : colorOf(ch, value);
-    if (value === OFF || value === SIGNOFF) b.style.color = "#f3f1e8";
-    return b;
-  }));
-
-  const day = sched.week[sched.day] || {};
-  $("sched-hours").replaceChildren(...Array.from({ length: 24 }, (_, h) => {
-    const value = day[String(h)] || OFF;
-    const row = el("div", { class: "hour" + (value ? "" : " off"), "data-hour": String(h) },
-      el("span", { class: "h" }, `${String(h).padStart(2, "0")}:00`),
-      el("span", { class: "v" }, labelOf(ch, value)));
-    row.style.background = value ? colorOf(ch, value) : "#1a1d3f";
-    if (value === SIGNOFF) row.querySelector(".v").style.color = "#f3f1e8";
-    return row;
-  }));
-}
-
-function paintHour(hour) {
-  const day = sched.week[sched.day] || (sched.week[sched.day] = {});
-  const current = day[hour] || OFF;
-  if (current === sched.brush) return;
-  if (sched.brush === OFF) delete day[hour];
-  else day[hour] = sched.brush;
-  setDirty(true);
-  renderSchedule();
-}
-
-function hourFromPoint(x, y) {
-  const node = document.elementFromPoint(x, y);
-  const row = node && node.closest(".hour");
-  return row ? row.dataset.hour : null;
-}
-
-function wireScheduleGrid() {
-  const hours = $("sched-hours");
-  // phones: each tap paints one hour (dragging scrolls the page);
-  // mouse: press and drag to paint several hours at once
-  hours.addEventListener("click", (e) => {
-    const h = hourFromPoint(e.clientX, e.clientY);
-    if (h !== null) paintHour(h);
-  });
-  hours.addEventListener("pointerdown", (e) => {
-    if (e.pointerType !== "mouse") return;
-    const h = hourFromPoint(e.clientX, e.clientY);
-    if (h === null) return;
-    e.preventDefault();
-    sched.painting = true;
-    paintHour(h);
-  });
-  hours.addEventListener("pointermove", (e) => {
-    if (!sched.painting) return;
-    const h = hourFromPoint(e.clientX, e.clientY);
-    if (h !== null) paintHour(h);
-  });
-  const stop = () => { sched.painting = false; };
-  window.addEventListener("pointerup", stop);
-  window.addEventListener("pointercancel", stop);
-
-  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => {
-    const targets = {
-      weekdays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
-      weekend: ["saturday", "sunday"],
-      all: DAYS.map((d) => d[0]),
-    }[b.dataset.copy];
-    const source = sched.week[sched.day] || {};
-    targets.forEach((d) => { sched.week[d] = { ...source }; });
-    setDirty(true);
-    toast("Día copiado. Recuerda guardar.");
-  }));
-
-  $("sched-channel").addEventListener("change", (e) => {
-    if (sched.dirty && !confirm("Hay cambios sin guardar en este canal. ¿Descartarlos?")) {
-      e.target.value = sched.channel.name;
-      return;
-    }
-    selectScheduleChannel(e.target.value);
-  });
-  $("sched-discard").addEventListener("click", () => selectScheduleChannel(sched.channel.name));
-  $("sched-save").addEventListener("click", saveSchedule);
-}
-
-async function saveSchedule() {
-  try {
-    await api(`/api/channels/${encodeURIComponent(sched.channel.name)}/schedule`,
-      { method: "PUT", json: { week: sched.week } });
-    setDirty(false);
-    toast("Programación guardada. La tele la aplica en unos minutos.");
-    await loadChannels();
-    selectScheduleChannel(sched.channel.name);
-  } catch (e) { toast(e.message); }
+  $("editor-url").textContent = `http://${location.host}/programacion`;
 }
 
 // ---------- channels ----------
@@ -352,7 +206,6 @@ async function saveChannel() {
       toast("Canal creado. La tele se reinicia en unos segundos.");
     }
     $("ch-editor").hidden = true;
-    sched.dirty = false;
     openMoreTab();
   } catch (e) { $("ch-msg").textContent = e.message; }
 }
@@ -434,7 +287,6 @@ async function renderHistory() {
 
 function wireManagement() {
   $("bt-save").addEventListener("click", saveBedtime);
-  wireScheduleGrid();
   $("ch-new").addEventListener("click", () => openEditor(null));
   $("ch-cancel").addEventListener("click", () => { $("ch-editor").hidden = true; });
   $("ch-save").addEventListener("click", saveChannel);
@@ -445,7 +297,6 @@ function wireManagement() {
   $("ch-ads-on").addEventListener("change", (e) => { $("ch-ads-opts").hidden = !e.target.checked; });
   $("ch-logo-file").addEventListener("change", (e) => { uploadLogo(e.target.files[0]); e.target.value = ""; });
   $("ch-logo-reset").addEventListener("click", resetLogo);
-  window.addEventListener("beforeunload", (e) => { if (sched.dirty) e.preventDefault(); });
 }
 
 wireManagement();

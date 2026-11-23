@@ -271,6 +271,12 @@ async def index():
     return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/programacion", include_in_schema=False)
+async def schedule_editor():
+    """The timeline editor, made for a computer screen."""
+    return FileResponse(STATIC_DIR / "programacion.html", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/manifest.webmanifest", include_in_schema=False)
 async def manifest():
     return FileResponse(STATIC_DIR / "manifest.webmanifest", media_type="application/manifest+json")
@@ -386,7 +392,7 @@ async def get_channels():
                 "videos": list_videos(Path(folder["path"])),
             })
         result.append({**{k: channel[k] for k in ("name", "long_name", "number", "type",
-                                                  "categories", "schedule", "ads", "logo")},
+                                                  "categories", "blocks", "ads", "logo")},
                        "folders": folders})
     return {"channels": result}
 
@@ -471,7 +477,14 @@ class EditChannelBody(BaseModel):
 
 
 class ScheduleBody(BaseModel):
-    week: dict[str, dict[str, str]]
+    # {"monday": [{"start": 7, "end": 10, "kind": "show", "tags": [...], ...}], ...}
+    blocks: dict[str, list[dict]]
+
+
+class DuplicateBody(BaseModel):
+    long_name: str
+    number: int
+    share_videos: bool = True
 
 
 def _confs_dir():
@@ -535,13 +548,33 @@ async def delete_channel(name: str, request: Request):
 @app.put("/api/channels/{name}/schedule", dependencies=[Depends(require_session)])
 async def save_schedule(name: str, body: ScheduleBody, request: Request):
     try:
-        conf = channels.set_week(channels.find_station(_confs_dir(), name), body.week)
+        conf = channels.set_blocks(channels.find_station(_confs_dir(), name), body.blocks)
     except channels.ChannelError as e:
         raise _channel_error(e)
     await _save_on_tv(fs42_client(request).update_station(name, conf))
     ensure_folders(conf)
     fs42_client(request).schedule_rebuild(name)
     return {"ok": True}
+
+
+@app.post("/api/channels/{name}/duplicate", dependencies=[Depends(require_session)])
+async def duplicate_channel(name: str, body: DuplicateBody, request: Request):
+    try:
+        source = channels.find_station(_confs_dir(), name)
+        conf = channels.duplicate_station_conf(source, channels.load_stations(_confs_dir()),
+                                               body.long_name, body.number, body.share_videos)
+    except channels.ChannelError as e:
+        raise _channel_error(e)
+    await _save_on_tv(fs42_client(request).create_station(conf))
+    if not body.share_videos:
+        logo = channels.logo_file(source, FS42_DIR)
+        if logo:
+            folder = channels.logo_folder(conf, FS42_DIR)
+            folder.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(logo, folder / logo.name)
+    ensure_folders(conf)
+    fs42_client(request).schedule_rebuild(conf["network_name"], restart=True)
+    return {"ok": True, "name": conf["network_name"]}
 
 
 # ---------- bedtime and power ----------

@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Programación · T-Rex Bites</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/programacion.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/" title="Volver al panel">
+      <img src="/static/icon.svg" alt=""><span>T-Rex Bites</span>
+    </a>
+    <h1>Programación</h1>
+    <label class="channel-pick">Canal
+      <select id="channel"></select>
+    </label>
+    <div class="tools">
+      <button id="undo" title="Deshacer (Ctrl+Z)" disabled>↶ Deshacer</button>
+      <button id="redo" title="Rehacer (Ctrl+Y)" disabled>↷</button>
+      <span class="sep"></span>
+      <button id="open-copy" title="Copiar la programación de un día a otros">📋 Copiar día</button>
+      <button id="open-random" title="Generar una programación al azar">🎲 Al azar</button>
+      <button id="open-dup" title="Crear otro canal igual a este">⧉ Duplicar canal</button>
+      <span class="sep"></span>
+      <span id="save-state" class="save-state"></span>
+      <button id="save" class="primary" title="Guardar (Ctrl+S)" disabled>Guardar</button>
+    </div>
+  </header>
+
+  <div class="layout" id="layout" hidden>
+    <aside class="palette">
+      <h2>Contenido</h2>
+      <p class="hint">Elige un contenido y <b>arrastra sobre la línea de tiempo</b> para crear un bloque.</p>
+      <div id="palette"></div>
+      <h2>Comerciales del canal</h2>
+      <p class="hint" id="ads-info"></p>
+      <h2>Atajos</h2>
+      <ul class="keys">
+        <li><kbd>Clic</kbd> en un bloque: editarlo</li>
+        <li><kbd>Arrastrar</kbd> un bloque: moverlo (también a otro día)</li>
+        <li><kbd>Bordes</kbd> del bloque: alargar o acortar</li>
+        <li><kbd>Supr</kbd> borrar bloque · <kbd>Ctrl+Z</kbd> deshacer</li>
+        <li><kbd>Ctrl+C</kbd> / <kbd>Ctrl+V</kbd> copiar un bloque a otro día</li>
+        <li><kbd>Ctrl+S</kbd> guardar</li>
+      </ul>
+    </aside>
+
+    <main class="timeline-area">
+      <div class="timeline-bar">
+        <label class="view-pick">Ver desde
+          <select id="view-from">
+            <option value="auto">donde empieza la programación</option>
+            <option value="0">00:00 (día completo)</option>
+            <option value="6">06:00</option>
+          </select>
+        </label>
+      </div>
+      <div class="timeline" id="timeline"></div>
+      <div class="legend">
+        <span><i class="sw off"></i> Fuera del aire</span>
+        <span>🔁 Capítulos en orden</span>
+        <span>🎲 Mezcla al azar</span>
+        <span>📺 Tanda propia</span>
+        <span>⏱ Duración limitada</span>
+      </div>
+    </main>
+
+    <aside class="inspector" id="inspector">
+      <div class="empty" id="insp-empty">
+        <h2>Bloque</h2>
+        <p class="hint">Haz clic en un bloque de la línea de tiempo para editarlo.</p>
+      </div>
+      <div id="insp-body" hidden>
+        <h2 id="insp-title">Bloque</h2>
+        <div class="row2">
+          <label>Empieza <select id="insp-start"></select></label>
+          <label>Termina <select id="insp-end"></select></label>
+        </div>
+        <div id="insp-show">
+          <fieldset>
+            <legend>Categorías</legend>
+            <div id="insp-tags" class="checks"></div>
+            <p class="hint small" id="insp-mix-note" hidden>🎲 Con varias categorías, cada programa sale al azar de cualquiera de ellas.</p>
+          </fieldset>
+          <fieldset>
+            <legend>Orden</legend>
+            <label class="radio"><input type="radio" name="insp-mode" value="random"> Al azar</label>
+            <label class="radio"><input type="radio" name="insp-mode" value="order"> 🔁 Capítulos en orden</label>
+            <p class="hint small">En orden, cada vez sigue con el capítulo que viene (por nombre de archivo: 01, 02, 03…).</p>
+          </fieldset>
+          <fieldset>
+            <legend>Duración de cada video</legend>
+            <select id="insp-duration">
+              <option value="any">Cualquiera</option>
+              <option value="short10">Cortos: hasta 10 min</option>
+              <option value="upto30">Hasta 30 min</option>
+              <option value="ep">Episodios: 15 a 45 min</option>
+              <option value="movie">Películas: más de 60 min</option>
+              <option value="custom">Personalizada…</option>
+            </select>
+            <div class="row2" id="insp-custom" hidden>
+              <label>Mínimo (min) <input type="number" id="insp-min" min="1" max="600"></label>
+              <label>Máximo (min) <input type="number" id="insp-max" min="1" max="600"></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Tanda de comerciales</legend>
+            <select id="insp-breaks">
+              <option value="">Como el canal</option>
+              <option value="end">Al final de cada programa</option>
+              <option value="standard">Repartidos durante el programa</option>
+              <option value="center">Una tanda a la mitad</option>
+            </select>
+            <p class="hint small" id="insp-ads-off" hidden>Los comerciales están apagados en este canal. Se activan en el panel: Más → Canales → Editar.</p>
+          </fieldset>
+        </div>
+        <p class="hint" id="insp-signoff" hidden>🌙 Fin de transmisión: pasa el cierre del canal y después queda fuera del aire hasta el siguiente bloque.</p>
+        <div class="actions">
+          <button id="insp-copy">📋 Copiar a otros días…</button>
+          <button id="insp-delete" class="danger">🗑 Borrar bloque</button>
+        </div>
+        <div id="insp-copy-days" class="copy-days" hidden>
+          <div class="checks" id="insp-copy-checks"></div>
+          <button id="insp-copy-go" class="primary">Copiar bloque</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- login -->
+  <div class="overlay" id="login" hidden>
+    <form class="card" id="login-form">
+      <img src="/static/icon.svg" alt="" class="big-logo">
+      <h2>Programación de T-Rex Bites</h2>
+      <p class="hint">Ingresa el PIN de padres</p>
+      <input type="password" id="login-pin" inputmode="numeric" autocomplete="current-password" autofocus>
+      <button class="primary" type="submit">Entrar</button>
+      <p class="error" id="login-error"></p>
+    </form>
+  </div>
+
+  <!-- dialogs -->
+  <dialog id="dlg-copy">
+    <form method="dialog" class="dlg">
+      <h2>📋 Copiar un día</h2>
+      <label>Copiar la programación del <select id="copy-from"></select></label>
+      <p>a estos días (se reemplaza lo que tengan):</p>
+      <div class="checks" id="copy-to"></div>
+      <div class="quick">
+        <button type="button" data-pick="weekdays">Lun–Vie</button>
+        <button type="button" data-pick="weekend">Sáb–Dom</button>
+        <button type="button" data-pick="all">Todos</button>
+        <button type="button" data-pick="none">Ninguno</button>
+      </div>
+      <menu><button value="cancel">Cancelar</button><button id="copy-go" class="primary" value="ok">Copiar</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-random">
+    <form method="dialog" class="dlg">
+      <h2>🎲 Programación al azar</h2>
+      <p class="hint">Arma bloques al azar con las categorías que elijas. Después puedes ajustar lo que quieras.</p>
+      <div class="row2">
+        <label>Desde las <select id="rnd-from"></select></label>
+        <label>Hasta las <select id="rnd-to"></select></label>
+      </div>
+      <label>Largo de cada bloque
+        <select id="rnd-len">
+          <option value="1">1 hora</option>
+          <option value="2">2 horas</option>
+          <option value="mix" selected>Variado (1 a 3 horas)</option>
+        </select>
+      </label>
+      <p>Categorías a usar:</p>
+      <div class="checks" id="rnd-tags"></div>
+      <p>Días (se reemplaza lo que tengan):</p>
+      <div class="checks" id="rnd-days"></div>
+      <label class="radio"><input type="checkbox" id="rnd-mix"> Algunos bloques mezclan dos categorías</label>
+      <label class="radio"><input type="checkbox" id="rnd-signoff" checked> Terminar con fin de transmisión</label>
+      <menu><button value="cancel">Cancelar</button><button id="rnd-go" class="primary" value="ok">Generar</button></menu>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-dup">
+    <form method="dialog" class="dlg">
+      <h2>⧉ Duplicar canal</h2>
+      <p class="hint">Crea un canal nuevo con las mismas categorías, programación, comerciales y logo que <b id="dup-src"></b>.</p>
+      <label>Nombre del canal nuevo <input type="text" id="dup-name" maxlength="30"></label>
+      <label>Número <input type="number" id="dup-number" min="1" max="99"></label>
+      <label class="radio"><input type="checkbox" id="dup-share" checked> Usar los mismos videos <small>(si no, el canal nuevo empieza con carpetas vacías)</small></label>
+      <p class="error" id="dup-error"></p>
+      <menu><button value="cancel">Cancelar</button><button id="dup-go" class="primary" value="ok">Crear canal</button></menu>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/static/programacion.js"></script>
+</body>
+</html>

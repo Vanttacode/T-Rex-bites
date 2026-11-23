@@ -11,7 +11,7 @@ def channels_by_name(client):
 def test_management_requires_pin(env):
     c = env["client"]
     assert c.post("/api/channels", json={"long_name": "X", "number": 7}).status_code == 401
-    assert c.put("/api/channels/TRexTV/schedule", json={"week": {}}).status_code == 401
+    assert c.put("/api/channels/TRexTV/schedule", json={"blocks": {}}).status_code == 401
     assert c.get("/api/bedtime").status_code == 401
     assert c.post("/api/power", json={"mode": "off"}).status_code == 401
     assert c.get("/api/history").status_code == 401
@@ -22,10 +22,10 @@ def test_channels_expose_categories_and_schedule(env):
     login(c)
     trex = channels_by_name(c)["TRexTV"]
     assert [cat["label"] for cat in trex["categories"]] == ["Mañana", "Dibujos animados", "Educativos", "Películas"]
-    assert trex["schedule"]["monday"]["7"] == "manana"
-    assert trex["schedule"]["monday"]["20"] == "signoff"
-    assert "3" not in trex["schedule"]["monday"]
-    assert channels_by_name(c)["DinoLoop"]["schedule"] is None
+    monday = trex["blocks"]["monday"]
+    assert (monday[0]["start"], monday[0]["end"], monday[0]["tags"]) == (7, 10, ["manana"])
+    assert monday[-1] == {"start": 20, "end": 21, "kind": "signoff"}
+    assert channels_by_name(c)["DinoLoop"]["blocks"] is None
 
 
 def test_create_scheduled_channel(env):
@@ -42,7 +42,9 @@ def test_create_scheduled_channel(env):
     ch = channels_by_name(c)[name]
     assert ch["long_name"] == "Canal Películas"
     assert [cat["tag"] for cat in ch["categories"]] == ["peliculas", "musica_infantil"]
-    assert ch["schedule"]["sunday"]["7"] == "peliculas"
+    assert ch["blocks"]["sunday"][0] == {"start": 7, "end": 20, "kind": "show", "tags": ["peliculas"],
+                                        "mode": "random", "breaks": None,
+                                        "min_minutes": None, "max_minutes": None}
     # empty category folders get the sample clip so the TV always has something to show
     folder = env["fs42"] / "catalog" / "canalpeliculas" / "musica_infantil"
     assert (folder / "_bienvenida_trexbites.mp4").exists()
@@ -129,33 +131,78 @@ def test_delete_channel_keeps_videos(env):
     assert c.delete("/api/channels/DinoLoop").status_code == 404
 
 
-def test_save_schedule(env):
+def block(start, end, tags, **extra):
+    return {"start": start, "end": end, "kind": "show", "tags": tags, **extra}
+
+
+def test_save_blocks(env):
     c = env["client"]
     login(c)
-    week = {day: {} for day in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")}
-    week["saturday"] = {"9": "peliculas", "10": "peliculas", "12": "signoff"}
-    resp = c.put("/api/channels/TRexTV/schedule", json={"week": week})
+    week = {day: [] for day in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")}
+    week["saturday"] = [
+        block(9, 12, ["dibujos"], mode="order", breaks="end", max_minutes=30),
+        block(12, 14, ["dibujos", "peliculas"]),
+        {"start": 20, "end": 23, "kind": "signoff"},
+    ]
+    resp = c.put("/api/channels/TRexTV/schedule", json={"blocks": week})
     assert resp.status_code == 200, resp.text
 
     saved = json.loads((env["fs42"] / "confs" / "trex_tv.json").read_text())["station_conf"]
     assert saved["monday"] == {}
-    assert saved["saturday"] == {"9": {"tags": "peliculas"}, "10": {"tags": "peliculas"}, "12": {"event": "signoff"}}
+    sat = saved["saturday"]
+    assert sat["9"] == {"tags": "dibujos", "sequence": "orden-dibujos", "break_strategy": "end", "max_duration": 30}
+    assert sat["11"] == {**sat["9"], "continued": True}
+    assert sat["12"] == {"tags": ["dibujos", "peliculas"], "random_tags": True}
+    assert sat["20"] == {"event": "signoff"} and "21" not in sat
+
+    # read back as the same blocks
+    blocks = channels_by_name(c)["TRexTV"]["blocks"]["saturday"]
+    assert [(b["start"], b["end"], b["kind"]) for b in blocks] == [(9, 12, "show"), (12, 14, "show"), (20, 21, "signoff")]
+    assert blocks[0]["mode"] == "order" and blocks[0]["max_minutes"] == 30
     # categories survive even when the schedule no longer uses them
     assert [cat["tag"] for cat in channels_by_name(c)["TRexTV"]["categories"]] == \
         ["manana", "dibujos", "educativo", "peliculas"]
     assert env["rebuilds"] == [("TRexTV", False)]
 
 
-def test_schedule_validation(env):
+def test_block_validation(env):
     c = env["client"]
     login(c)
-    bad_tag = c.put("/api/channels/TRexTV/schedule", json={"week": {"monday": {"9": "nope"}}})
-    assert bad_tag.status_code == 400
-    bad_hour = c.put("/api/channels/TRexTV/schedule", json={"week": {"monday": {"24": "dibujos"}}})
-    assert bad_hour.status_code == 400
-    loop = c.put("/api/channels/DinoLoop/schedule", json={"week": {}})
-    assert loop.status_code == 400
-    assert c.put("/api/channels/Nope/schedule", json={"week": {}}).status_code == 400
+
+    def put(blocks):
+        return c.put("/api/channels/TRexTV/schedule", json={"blocks": {"monday": blocks}})
+
+    assert put([block(9, 10, ["nope"])]).status_code == 400
+    assert put([block(23, 25, ["dibujos"])]).status_code == 400
+    assert put([block(9, 12, ["dibujos"]), block(11, 13, ["peliculas"])]).status_code == 400  # overlap
+    assert put([block(9, 10, ["dibujos", "peliculas"], mode="order")]).status_code == 400
+    assert put([block(9, 10, ["dibujos"], breaks="nunca")]).status_code == 400
+    assert put([block(9, 10, ["dibujos"], min_minutes=40, max_minutes=20)]).status_code == 400
+    assert put([block(9, 10, [])]).status_code == 400
+    assert c.put("/api/channels/DinoLoop/schedule", json={"blocks": {}}).status_code == 400
+    assert c.put("/api/channels/Nope/schedule", json={"blocks": {}}).status_code == 400
+
+
+def test_duplicate_channel(env):
+    c = env["client"]
+    login(c)
+    resp = c.post("/api/channels/TRexTV/duplicate", json={"long_name": "T-Rex Fin de semana", "number": 4})
+    assert resp.status_code == 200, resp.text
+    copy = channels_by_name(c)[resp.json()["name"]]
+    orig = channels_by_name(c)["TRexTV"]
+    assert copy["number"] == 4 and copy["long_name"] == "T-Rex Fin de semana"
+    assert copy["blocks"] == orig["blocks"] and copy["categories"] == orig["categories"]
+    # same videos by default
+    conf = json.loads((env["fs42"] / "confs" / f"{resp.json()['name']}.json").read_text())["station_conf"]
+    assert conf["content_dir"] == "catalog/trex_tv"
+    assert env["rebuilds"][-1] == (resp.json()["name"], True)
+
+    own = c.post("/api/channels/TRexTV/duplicate", json={"long_name": "Otro", "number": 6, "share_videos": False})
+    conf = json.loads((env["fs42"] / "confs" / f"{own.json()['name']}.json").read_text())["station_conf"]
+    assert conf["content_dir"] == "catalog/otro"
+    assert (env["fs42"] / "catalog" / "otro" / "dibujos" / "_bienvenida_trexbites.mp4").exists()
+    taken = c.post("/api/channels/TRexTV/duplicate", json={"long_name": "X", "number": 3})
+    assert taken.status_code == 400
 
 
 def test_upload_replaces_sample_clip_and_delete_restores_it(env):

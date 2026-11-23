@@ -30,7 +30,8 @@
 
 ## 👨‍👧 Fase 4: para padres
 
-- [x] Grilla semanal de programación por canal (pintar horas con categorías o fin de transmisión).
+- [x] Editor de programación en el computador: línea de tiempo semanal con bloques, capítulos en orden, mezclas al azar, duración de videos, tandas por bloque, copiar días, programación al azar y duplicar canal.
+- [ ] Bloques de media hora y programación por fecha (feriados, cumpleaños).
 - [x] Hora de dormir: apagado automático con pantalla "¡A dormir!", "Apagar hasta mañana" y "1 hora extra".
 - [x] Crear, renombrar, renumerar y borrar canales, con sus categorías.
 - [x] Historial: qué pasó la tele cada día y cuántos minutos.
