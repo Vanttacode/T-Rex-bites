@@ -26,7 +26,7 @@ def test_enable_commercials(env):
     assert (folder / "_ident_trexbites.mp4").exists()
     trex = [ch for ch in c.get("/api/channels").json()["channels"] if ch["name"] == "TRexTV"][0]
     assert trex["ads"] == {"enabled": True, "strategy": "end", "duration": 90}
-    assert trex["folders"][-1]["tag"] == "_comerciales"
+    assert "_comerciales" in [f["tag"] for f in trex["folders"]]
     assert env["rebuilds"] == [("TRexTV", True)]
 
     # the first real commercial replaces the sample

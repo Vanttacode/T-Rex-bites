@@ -54,7 +54,8 @@ def test_channels_from_default_confs(env):
     channels = c.get("/api/channels").json()["channels"]
     assert [ch["number"] for ch in channels] == [3, 5]
     trex = channels[0]
-    assert {f["tag"] for f in trex["folders"]} == {"manana", "dibujos", "educativo", "peliculas"}
+    assert {f["tag"] for f in trex["folders"]} == {"manana", "dibujos", "educativo", "peliculas",
+                                                       "_cortinillas", "_fijos"}
     assert channels[1]["folders"][0]["tag"] is None
 
 

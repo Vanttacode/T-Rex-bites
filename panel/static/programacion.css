@@ -149,3 +149,7 @@ menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 8
   background: #000; color: #fff; padding: 10px 18px; border-radius: 10px;
 }
 .dlg .checks label, .dlg label.radio { display: flex; align-items: center; gap: 8px; color: var(--text); }
+
+.brush.program { padding-left: 22px; font-size: 13px; }
+.inspector .checks label.program { padding-left: 18px; font-size: 13px; }
+.inspector fieldset label { margin-top: 8px; }

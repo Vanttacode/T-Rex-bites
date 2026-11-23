@@ -14,5 +14,11 @@ polkit.addRule(function (action, subject) {
         action.lookup("verb") == "start") {
         return polkit.Result.YES;
     }
+    // "Importar desde pendrive": open and eject USB sticks
+    if (action.id.indexOf("org.freedesktop.udisks2.filesystem-mount") == 0 ||
+        action.id.indexOf("org.freedesktop.udisks2.eject-media") == 0 ||
+        action.id.indexOf("org.freedesktop.udisks2.power-off-drive") == 0) {
+        return polkit.Result.YES;
+    }
     return polkit.Result.NOT_HANDLED;
 });

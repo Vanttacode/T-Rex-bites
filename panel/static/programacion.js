@@ -72,10 +72,18 @@ function toast(msg) {
 const hh = (h) => `${String(h).padStart(2, "0")}:00`;
 const clone = (x) => JSON.parse(JSON.stringify(x));
 const categories = () => (st.channel ? st.channel.categories : []);
-const labelOf = (tag) => (categories().find((c) => c.tag === tag) || { label: tag }).label;
+// categories and "category/program" tags, in order
+const contentList = () => (st.channel ? st.channel.content || categories() : []);
+const labelOf = (tag) => (contentList().find((c) => c.tag === tag) || { label: tag }).label;
+const shortLabel = (tag) => (tag.includes("/") ? labelOf(tag).split(" › ").pop() : labelOf(tag));
 const colorOf = (tag) => {
-  const i = categories().findIndex((c) => c.tag === tag);
+  const i = categories().findIndex((c) => c.tag === tag.split("/")[0]);
   return COLORS[(i < 0 ? 0 : i) % COLORS.length];
+};
+const pautaLabel = (tag) => ((st.channel.pautas || []).find((x) => x.tag === tag) || { label: tag }).label;
+const fixedVideos = () => {
+  const f = (st.channel.folders || []).find((x) => x.tag === "_fijos");
+  return f ? f.videos.filter((v) => !v.placeholder && !v.name.includes("/")).map((v) => v.name) : [];
 };
 
 function blockColor(b) {
@@ -87,7 +95,7 @@ function blockColor(b) {
 
 function blockTitle(b) {
   if (b.kind === SIGNOFF) return "🌙 Cierre";
-  return b.tags.map(labelOf).join(" + ");
+  return b.tags.map(shortLabel).join(" + ");
 }
 
 function blockMeta(b) {
@@ -96,6 +104,8 @@ function blockMeta(b) {
   if (b.tags.length > 1) bits.push("🎲");
   if (b.mode === "order") bits.push("🔁");
   if (b.breaks) bits.push(`📺 ${BREAKS[b.breaks]}`);
+  if (b.pauta) bits.push(`📺 ${pautaLabel(b.pauta)}`);
+  if (b.start_video || b.end_video) bits.push("📌");
   if (b.min_minutes || b.max_minutes) {
     bits.push(`⏱ ${b.min_minutes ? b.min_minutes + "+" : ""}${b.min_minutes && b.max_minutes ? " " : ""}${b.max_minutes ? "≤" + b.max_minutes : ""} min`);
   }
@@ -177,7 +187,8 @@ function fits(day, start, end, ignoreIndex) {
 
 function brushBlock(start, end) {
   if (st.brush === SIGNOFF) return { start, end: start + 1, kind: SIGNOFF };
-  return { start, end, kind: "show", tags: [st.brush], mode: "random", breaks: null, min_minutes: null, max_minutes: null };
+  return { start, end, kind: "show", tags: [st.brush], mode: "random", breaks: null, min_minutes: null, max_minutes: null,
+    pauta: null, start_video: null, end_video: null };
 }
 
 function selectedBlock() {
@@ -246,16 +257,16 @@ function renderBlock(day, b, index) {
 }
 
 function renderPalette() {
-  const items = categories().map((c) => ({ value: c.tag, label: c.label, color: colorOf(c.tag) }));
+  const items = contentList().map((c) => ({ value: c.tag, label: shortLabel(c.tag), color: colorOf(c.tag), program: c.tag.includes("/") }));
   items.push({ value: SIGNOFF, label: "🌙 Fin de transmisión", color: "#3d4170" });
   if (!items.some((i) => i.value === st.brush)) st.brush = items[0].value;
   $("palette").replaceChildren(...items.map((it) => {
     const swatch = el("i");
     swatch.style.background = it.color;
     return el("button", {
-      class: "brush" + (st.brush === it.value ? " active" : ""), type: "button",
+      class: "brush" + (st.brush === it.value ? " active" : "") + (it.program ? " program" : ""), type: "button",
       onclick: () => { st.brush = it.value; renderPalette(); },
-    }, swatch, it.label);
+    }, swatch, it.program ? `↳ ${it.label}` : it.label);
   }));
   const ads = st.channel.ads || {};
   $("ads-info").textContent = ads.enabled
@@ -284,17 +295,18 @@ function renderInspector() {
   endSel.disabled = !isShow;
   if (!isShow) return;
 
-  $("insp-tags").replaceChildren(...categories().map((c) => {
+  $("insp-tags").replaceChildren(...contentList().map((c) => {
     const box = el("input", { type: "checkbox", value: c.tag });
     box.checked = b.tags.includes(c.tag);
     box.addEventListener("change", () => {
-      const tags = categories().map((x) => x.tag).filter((t) => (t === c.tag ? box.checked : b.tags.includes(t)));
-      if (!tags.length) { box.checked = true; toast("El bloque necesita al menos una categoría."); return; }
+      const tags = contentList().map((x) => x.tag).filter((t) => (t === c.tag ? box.checked : b.tags.includes(t)));
+      if (!tags.length) { box.checked = true; toast("El bloque necesita al menos una categoría o programa."); return; }
       updateSelected({ tags, mode: tags.length > 1 ? "random" : b.mode });
     });
     const sw = el("i", { class: "sw" });
     sw.style.background = colorOf(c.tag);
-    return el("label", {}, box, sw, c.label);
+    const program = c.tag.includes("/");
+    return el("label", { class: program ? "program" : null }, box, sw, program ? `↳ ${shortLabel(c.tag)}` : c.label);
   }));
   $("insp-mix-note").hidden = b.tags.length < 2;
   document.querySelectorAll('input[name="insp-mode"]').forEach((r) => {
@@ -310,6 +322,20 @@ function renderInspector() {
   const adsOn = st.channel.ads && st.channel.ads.enabled;
   $("insp-breaks").disabled = !adsOn;
   $("insp-ads-off").hidden = !!adsOn;
+  const pautas = st.channel.pautas || [];
+  $("insp-pauta").replaceChildren(el("option", { value: "" }, "Comerciales del canal"),
+    ...pautas.map((x) => el("option", { value: x.tag }, `Pauta: ${x.label}`)));
+  $("insp-pauta").value = b.pauta || "";
+  $("insp-pauta").disabled = !adsOn || !pautas.length;
+  const vids = fixedVideos();
+  for (const key of ["start_video", "end_video"]) {
+    const sel = $(key === "start_video" ? "insp-start-video" : "insp-end-video");
+    const names = b[key] && !vids.includes(b[key]) ? [...vids, b[key]] : vids;
+    sel.replaceChildren(el("option", { value: "" }, "Ninguno"), ...names.map((n) => el("option", { value: n }, n)));
+    sel.value = b[key] || "";
+    sel.disabled = !names.length;
+  }
+  $("insp-fixed-note").hidden = vids.length > 0;
 }
 
 function renderStatus() {
@@ -469,6 +495,9 @@ function wireInspector() {
   $("insp-min").addEventListener("change", custom);
   $("insp-max").addEventListener("change", custom);
   $("insp-breaks").addEventListener("change", (e) => updateSelected({ breaks: e.target.value || null }));
+  $("insp-pauta").addEventListener("change", (e) => updateSelected({ pauta: e.target.value || null }));
+  $("insp-start-video").addEventListener("change", (e) => updateSelected({ start_video: e.target.value || null }));
+  $("insp-end-video").addEventListener("change", (e) => updateSelected({ end_video: e.target.value || null }));
   $("insp-delete").addEventListener("click", deleteSelected);
   $("insp-copy").addEventListener("click", () => {
     const box = $("insp-copy-days");
@@ -557,7 +586,8 @@ function wireDialogs() {
           let choice = tags.length > 1 ? pick(tags.filter((t) => t !== last)) : tags[0];
           const blockTags = [choice];
           if (mix && tags.length > 1 && Math.random() < 0.3) blockTags.push(pick(tags.filter((t) => t !== choice)));
-          blocks.push({ start: h, end, kind: "show", tags: blockTags, mode: "random", breaks: null, min_minutes: null, max_minutes: null });
+          blocks.push({ start: h, end, kind: "show", tags: blockTags, mode: "random", breaks: null, min_minutes: null, max_minutes: null,
+            pauta: null, start_video: null, end_video: null });
           last = choice;
           h = end;
         }

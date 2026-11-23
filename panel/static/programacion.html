@@ -63,6 +63,7 @@
         <span>🔁 Capítulos en orden</span>
         <span>🎲 Mezcla al azar</span>
         <span>📺 Tanda propia</span>
+        <span>📌 Video fijo</span>
         <span>⏱ Duración limitada</span>
       </div>
     </main>
@@ -80,9 +81,10 @@
         </div>
         <div id="insp-show">
           <fieldset>
-            <legend>Categorías</legend>
+            <legend>Categorías y programas</legend>
             <div id="insp-tags" class="checks"></div>
-            <p class="hint small" id="insp-mix-note" hidden>🎲 Con varias categorías, cada programa sale al azar de cualquiera de ellas.</p>
+            <p class="hint small" id="insp-mix-note" hidden>🎲 Con varias, cada programa sale al azar de cualquiera de ellas.</p>
+            <p class="hint small">Una categoría incluye todos sus programas; un programa (↳) pasa solo ese.</p>
           </fieldset>
           <fieldset>
             <legend>Orden</legend>
@@ -113,7 +115,16 @@
               <option value="standard">Repartidos durante el programa</option>
               <option value="center">Una tanda a la mitad</option>
             </select>
+            <label>Pauta
+              <select id="insp-pauta"></select>
+            </label>
             <p class="hint small" id="insp-ads-off" hidden>Los comerciales están apagados en este canal. Se activan en el panel: Más → Canales → Editar.</p>
+          </fieldset>
+          <fieldset>
+            <legend>📌 Videos fijos</legend>
+            <label>Al empezar el bloque <select id="insp-start-video"></select></label>
+            <label>Al terminar el bloque <select id="insp-end-video"></select></label>
+            <p class="hint small" id="insp-fixed-note">Se suben en el panel: Subir → "📌 Videos fijos". Ej: una presentación "¡Comienza la hora de Bluey!".</p>
           </fieldset>
         </div>
         <p class="hint" id="insp-signoff" hidden>🌙 Fin de transmisión: pasa el cierre del canal y después queda fuera del aire hasta el siguiente bloque.</p>

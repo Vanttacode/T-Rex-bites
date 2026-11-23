@@ -237,3 +237,31 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .logo-row img { width: 96px; height: 72px; object-fit: contain; background: #000; border-radius: 10px; padding: 6px; }
 .logo-actions { display: flex; flex-direction: column; gap: 8px; }
 #ch-ads-opts { margin-left: 4px; }
+
+/* v0.5: library, programs, USB */
+.lib-tools { display: flex; gap: 10px; padding: 12px; }
+.lib-tools input, .lib-tools select {
+  flex: 1; min-width: 0; padding: 10px; border-radius: 10px; border: 2px solid var(--panel-2);
+  background: #15183a; color: var(--text); font: inherit;
+}
+.lib-folder { border-top: 1px solid rgba(255,255,255,0.08); padding: 4px 0; }
+.lib-folder > summary { cursor: pointer; padding: 10px 0; font-weight: bold; list-style-position: inside; }
+.lib-folder.program > summary { padding-left: 18px; font-weight: normal; }
+.video-row .vinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.video-row .vinfo .name { overflow-wrap: anywhere; }
+.video-row .size { color: var(--muted); font-size: 0.85rem; }
+.thumb { width: 72px; height: 42px; object-fit: cover; border-radius: 6px; background: #0f1126; flex: none; }
+.badge.when { background: #2d4a7a; color: #cfe3ff; }
+.badge.dup { background: #6b4a12; color: #ffe1a8; }
+.cat-item { flex-direction: column; align-items: stretch !important; }
+.cat-row { display: flex; align-items: center; gap: 8px; }
+.cat-row input { flex: 1; min-width: 0; }
+.prog-list { list-style: none; padding: 0 0 0 22px; margin: 6px 0 0; display: grid; gap: 6px; }
+.prog-list li { display: flex; align-items: center; gap: 8px; }
+.prog-list input { flex: 1; min-width: 0; padding: 8px; border-radius: 8px; border: 2px solid var(--panel-2); background: #15183a; color: var(--text); font: inherit; }
+.usb-files { max-height: 320px; overflow-y: auto; margin: 8px 0; }
+.usb-folder { color: var(--accent); font-weight: bold; margin: 10px 0 4px; overflow-wrap: anywhere; }
+.usb-file { overflow-wrap: anywhere; }
+.chbtn.active { outline: 3px solid var(--accent); }
+#tv-keypad { margin-top: 8px; }
+.wide { display: block; width: 100%; margin-top: 12px; }

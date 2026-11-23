@@ -2,6 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 let channelsCache = [];
+let whenOptions = null;
 let pin = "";
 
 // ---------- helpers ----------
@@ -138,6 +139,7 @@ async function refreshStatus() {
         p.title ? `Ahora: ${p.title}` : "Sin programa en este momento",
       );
     }
+    $("pin-pad-card").hidden = !(s.online && !notTv && p.awaiting_pin);
     const working = Object.entries(s.rebuilds || {}).filter(([, r]) => r.status === "waiting" || r.status === "running");
     if (working.length) now.append(el("br"), el("span", { class: "muted" }, "Actualizando la programación…"));
   } catch (_) { /* toast already shown or logged out */ }
@@ -149,11 +151,20 @@ function renderChannelButtons() {
   }, el("span", { class: "num" }, String(c.number)), c.long_name)));
 }
 
+async function sendDigit(d) {
+  try {
+    await api(`/api/remote/digit/${d}`, { method: "POST" });
+    if (navigator.vibrate) navigator.vibrate(20);
+    setTimeout(refreshStatus, 900);
+  } catch (e) { toast(e.message); }
+}
+
 // ---------- channels / upload ----------
 
 async function loadChannels() {
   const data = await api("/api/channels");
   channelsCache = data.channels;
+  if (data.when && !whenOptions) { whenOptions = data.when; fillWhen(); }
   renderChannelButtons();
   const sel = $("up-channel");
   const previous = sel.value;
@@ -162,11 +173,47 @@ async function loadChannels() {
   fillTags();
 }
 
+// upload destinations grouped: programs, commercials, channel extras
+function folderGroup(tag) {
+  if (tag === null) return "Videos";
+  if (tag === "_comerciales" || tag.startsWith("_pauta/")) return "Comerciales";
+  if (tag.startsWith("_")) return "Extras del canal";
+  return "Categorías y programas";
+}
+
+function folderOptions(ch, selected) {
+  const groups = new Map();
+  for (const f of ch ? ch.folders : []) {
+    const g = folderGroup(f.tag);
+    if (!groups.has(g)) groups.set(g, el("optgroup", { label: g }));
+    const label = f.tag && f.tag.includes("/") ? `   ↳ ${f.label.split(" › ").pop()}` : f.label;
+    const opt = el("option", { value: f.tag ?? "" }, label);
+    if ((f.tag ?? "") === selected) opt.selected = true;
+    groups.get(g).append(opt);
+  }
+  return [...groups.values()];
+}
+
 function fillTags() {
   const ch = channelsCache.find((c) => c.name === $("up-channel").value);
   const tagSel = $("up-tag");
-  tagSel.replaceChildren(...(ch ? ch.folders : []).map((f) => el("option", { value: f.tag ?? "" }, f.label)));
+  const prev = tagSel.value;
+  tagSel.replaceChildren(...folderOptions(ch, prev));
   tagSel.parentElement.hidden = !ch || (ch.folders.length === 1 && ch.folders[0].tag === null);
+}
+
+function fillWhen() {
+  const opts = (sel, first, map) => $(sel).replaceChildren(el("option", { value: "" }, first),
+    ...Object.entries(map).map(([k, v]) => el("option", { value: k }, v)));
+  opts("up-when-part", "Todo el día", whenOptions.parts);
+  opts("up-when-day", "Todos los días", whenOptions.days);
+  opts("up-when-month", "Todo el año", whenOptions.months);
+}
+
+function whenSummary() {
+  const bits = ["up-when-part", "up-when-day", "up-when-month"]
+    .map((id) => $(id)).filter((s) => s.value).map((s) => s.selectedOptions[0].textContent.split(" (")[0]);
+  $("up-when-sum").textContent = bits.length ? bits.join(" · ") : "Siempre";
 }
 
 async function refreshDisk() {
@@ -180,13 +227,14 @@ function uploadFiles(files) {
   const channel = $("up-channel").value;
   const tag = $("up-tag").value;
   if (!channel) { toast("Primero elige un canal"); return; }
-  [...files].forEach((file) => uploadOne(file, channel, tag));
+  const when = { when_part: $("up-when-part").value, when_day: $("up-when-day").value, when_month: $("up-when-month").value };
+  [...files].forEach((file) => uploadOne(file, channel, tag, when));
 }
 
 // one upload at a time keeps an old laptop and the home WiFi responsive
 let uploadQueue = Promise.resolve();
 
-function uploadOne(file, channel, tag) {
+function uploadOne(file, channel, tag, when = {}) {
   const bar = el("div");
   const label = el("span", {}, "En espera…");
   const item = el("li", {}, el("b", {}, file.name), el("br"), label, el("div", { class: "bar" }, bar));
@@ -196,6 +244,7 @@ function uploadOne(file, channel, tag) {
     const form = new FormData();
     form.append("channel", channel);
     form.append("tag", tag);
+    for (const [k, v] of Object.entries(when)) if (v) form.append(k, v);
     form.append("file", file);
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload");
@@ -230,6 +279,16 @@ function uploadOne(file, channel, tag) {
 
 // ---------- library ----------
 
+function fmtDuration(sec) {
+  if (sec == null) return "";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+}
+
+const probed = new Set();
+
 async function renderLibrary() {
   const root = $("library");
   try {
@@ -238,16 +297,44 @@ async function renderLibrary() {
     root.replaceChildren(el("p", { class: "error" }, e.message));
     return;
   }
-  root.replaceChildren(...channelsCache.map((c) => {
+  const chSel = $("lib-channel");
+  const prev = chSel.value;
+  chSel.replaceChildren(el("option", { value: "" }, "Todos los canales"),
+    ...channelsCache.map((c) => el("option", { value: c.name }, `${c.number} · ${c.long_name}`)));
+  chSel.value = prev;
+  drawLibrary();
+}
+
+function drawLibrary() {
+  const root = $("library");
+  const q = $("lib-search").value.trim().toLowerCase();
+  const only = $("lib-channel").value;
+  root.replaceChildren(...channelsCache.filter((c) => !only || c.name === only).map((c) => {
     const card = el("div", { class: "card" }, el("h2", {}, `${c.number} · ${c.long_name}`));
+    // same size twice in a channel: almost surely the same video uploaded twice
+    const sizes = {};
+    c.folders.forEach((f) => f.videos.forEach((v) => { if (!v.placeholder) sizes[v.size] = (sizes[v.size] || 0) + 1; }));
     for (const f of c.folders) {
-      const block = el("div", { class: "lib-folder" }, el("h3", {}, `${f.label} (${f.videos.length})`));
-      if (!f.videos.length) block.append(el("p", { class: "muted" }, "Todavía no hay videos aquí."));
-      for (const v of f.videos) {
-        const name = el("span", { class: "name" }, v.name);
+      const videos = f.videos.filter((v) => !q || v.name.toLowerCase().includes(q));
+      if (q && !videos.length) continue;
+      const total = f.videos.reduce((s, v) => s + (v.duration || 0), 0);
+      const isProgram = f.tag && f.tag.includes("/");
+      const head = el("summary", {}, el("span", {}, `${isProgram ? "↳ " : ""}${f.label}`),
+        el("small", { class: "muted" }, ` ${f.videos.length} videos${total ? " · " + fmtDuration(total) : ""}`));
+      const block = el("details", { class: "lib-folder" + (isProgram ? " program" : "") }, head);
+      if (q) block.open = true;
+      block.addEventListener("toggle", () => { if (block.open) probeFolder(c, f); });
+      if (!videos.length) block.append(el("p", { class: "muted" }, "Todavía no hay videos aquí."));
+      for (const v of videos) {
+        const name = el("span", { class: "name" }, v.file || v.name);
         if (v.placeholder) name.append(el("span", { class: "badge" }, "de ejemplo"));
-        block.append(el("div", { class: "video-row" }, name,
-          el("span", { class: "size" }, formatSize(v.size)),
+        if (v.when) name.append(el("span", { class: "badge when" }, "🕒 " + v.when));
+        if (!v.placeholder && sizes[v.size] > 1) name.append(el("span", { class: "badge dup" }, "repetido"));
+        const thumb = el("img", { class: "thumb", loading: "lazy", alt: "",
+          src: `/api/library/thumb?channel=${encodeURIComponent(c.name)}&tag=${encodeURIComponent(f.tag ?? "")}&name=${encodeURIComponent(v.name)}` });
+        const meta = el("span", { class: "size" }, [fmtDuration(v.duration), formatSize(v.size)].filter(Boolean).join(" · "));
+        block.append(el("div", { class: "video-row" }, thumb, el("span", { class: "vinfo" }, name, meta),
+          el("button", { class: "btn small ghost", "aria-label": `Mover ${v.name}`, onclick: () => moveVideo(c, f, v) }, "↔"),
           el("button", { class: "btn danger", "aria-label": `Borrar ${v.name}`, onclick: () => deleteVideo(c, f, v) }, "🗑")));
       }
       card.append(block);
@@ -256,8 +343,41 @@ async function renderLibrary() {
   }));
 }
 
+async function probeFolder(c, f) {
+  const key = `${c.name}|${f.tag}`;
+  if (probed.has(key) || !f.videos.some((v) => v.duration == null && !v.placeholder)) return;
+  probed.add(key);
+  try {
+    const res = await api("/api/library/probe", { json: { channel: c.name, tag: f.tag } });
+    let changed = false;
+    f.videos.forEach((v) => { if (res.durations[v.name] != null && v.duration == null) { v.duration = res.durations[v.name]; changed = true; } });
+    if (changed) {
+      const open = [...document.querySelectorAll(".lib-folder")].map((d) => d.open);
+      drawLibrary();
+      document.querySelectorAll(".lib-folder").forEach((d, i) => { d.open = open[i]; });
+    }
+  } catch (_) { /* durations are a nice-to-have */ }
+}
+
+async function moveVideo(channel, folder, video) {
+  const dests = [];
+  channelsCache.forEach((c) => c.folders.forEach((f) => {
+    if (c.name !== channel.name || f.tag !== folder.tag) dests.push({ c, f });
+  }));
+  const list = dests.map((d, i) => `${i + 1}. ${d.c.long_name} › ${d.f.label}`).join("\n");
+  const answer = prompt(`¿A dónde mover "${video.file || video.name}"? Escribe el número:\n\n${list}`);
+  const n = Number(answer);
+  if (!answer || !n || n < 1 || n > dests.length) return;
+  const d = dests[n - 1];
+  try {
+    await api("/api/library/move", { json: { channel: channel.name, tag: folder.tag, name: video.name, to_channel: d.c.name, to_tag: d.f.tag } });
+    toast("Video movido");
+    renderLibrary();
+  } catch (e) { toast(e.message); }
+}
+
 async function deleteVideo(channel, folder, video) {
-  if (!confirm(`¿Borrar "${video.name}" de ${channel.long_name}?`)) return;
+  if (!confirm(`¿Borrar "${video.file || video.name}" de ${channel.long_name}?`)) return;
   try {
     await api("/api/library/delete", { json: { channel: channel.name, tag: folder.tag, name: video.name } });
     toast("Video borrado");
@@ -316,6 +436,13 @@ function wireUp() {
   document.querySelectorAll("[data-remote]").forEach((b) => b.addEventListener("click", () => sendRemote(b.dataset.remote)));
   document.querySelectorAll(".tabbar button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
   $("up-channel").addEventListener("change", fillTags);
+  ["up-when-part", "up-when-day", "up-when-month"].forEach((id) => $(id).addEventListener("change", whenSummary));
+  $("lib-search").addEventListener("input", drawLibrary);
+  $("lib-channel").addEventListener("change", drawLibrary);
+  const tvKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", ""];
+  $("tv-keypad").replaceChildren(...tvKeys.map((k) => el("button", {
+    class: "key", type: "button", onclick: () => k && sendDigit(k === "⌫" ? "clear" : k),
+  }, k)));
   $("up-files").addEventListener("change", (e) => { uploadFiles(e.target.files); e.target.value = ""; });
   const dz = $("dropzone");
   dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("over"); });

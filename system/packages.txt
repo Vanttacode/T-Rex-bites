@@ -49,3 +49,7 @@ avahi-daemon
 libnss-mdns
 mesa-va-drivers
 mesa-vdpau-drivers
+# importar videos desde un pendrive
+udisks2
+ntfs-3g
+exfatprogs

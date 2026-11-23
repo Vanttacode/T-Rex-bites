@@ -85,13 +85,42 @@ else
         [ -f "$f" ] || continue
         sed -i -E '/^Components:/ { / non-free-firmware/! s/$/ non-free-firmware/ }' "$f"
     done
+    # a TV installed from the USB without internet still lists the USB ("cdrom")
+    # as a package source: apt fails on it once the USB is gone
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+        [ -f "$f" ] && sed -i -E 's|^(deb(-src)? +cdrom:)|# \1|' "$f"
+    done
+    if ! grep -qsE '^deb ' /etc/apt/sources.list /etc/apt/sources.list.d/*.list \
+        && ! ls /etc/apt/sources.list.d/*.sources >/dev/null 2>&1; then
+        cat > /etc/apt/sources.list <<'SOURCES'
+deb http://deb.debian.org/debian trixie main non-free-firmware
+deb http://deb.debian.org/debian trixie-updates main non-free-firmware
+deb http://security.debian.org/debian-security trixie-security main non-free-firmware
+SOURCES
+    fi
     APT=(apt-get)
-    "${APT[@]}" update
+    # one broken source must not stop an update: what's already installed keeps working
+    "${APT[@]}" update || echo "(aviso) apt-get update tuvo errores, sigo con lo que hay"
     mapfile -t -O "${#PACKAGES[@]}" PACKAGES < <(read_list packages-build.txt)
 fi
 
 step "Instalando paquetes del sistema"
-"${APT[@]}" install -y --no-install-recommends "${PACKAGES[@]}"
+if ! "${APT[@]}" install -y --no-install-recommends "${PACKAGES[@]}"; then
+    # install them one by one, so one missing package doesn't block the rest
+    echo "(aviso) instalación en bloque falló; pruebo paquete por paquete"
+    "${APT[@]}" -f install -y || true
+    missing=()
+    for pkg in "${PACKAGES[@]}"; do
+        "${APT[@]}" install -y --no-install-recommends "$pkg" || missing+=("$pkg")
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then
+        echo "(aviso) no se pudieron instalar: ${missing[*]}"
+        # without these the TV can't work at all
+        for pkg in python3 python3-venv mpv ffmpeg; do
+            dpkg -s "$pkg" >/dev/null 2>&1 || { echo "ERROR: falta $pkg" >&2; exit 1; }
+        done
+    fi
+fi
 
 # hardware support: install whatever exists, skip the rest
 for pkg in "${OPTIONAL_PACKAGES[@]}"; do

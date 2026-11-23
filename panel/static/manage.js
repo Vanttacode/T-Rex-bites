@@ -96,14 +96,19 @@ function openScheduleTab() {
 
 // ---------- channels ----------
 
-const editor = { channel: null, cats: [] };
+const editor = { channel: null, cats: [], pautas: [] };
 
 function typeLabel(c) {
-  return c.type === "loop" ? "🔁 Todo el día" : `🗓 Con horario · ${c.categories.length} categorías`;
+  if (c.type === "loop") return "🔁 Todo el día";
+  const progs = c.categories.reduce((n, cat) => n + (cat.programs || []).length, 0);
+  const base = c.kind === "music" ? "🎵 Música" : "🗓 Con horario";
+  return `${base} · ${c.categories.length} categorías${progs ? ` · ${progs} programas` : ""}${c.parental ? " · 🔒" : ""}`;
 }
 
 async function openMoreTab() {
   loadWifi();
+  loadTvSettings();
+  loadGuide();
   loadUpdate(false);
   renderHistory();
   try { await loadChannels(); } catch (e) { toast(e.message); return; }
@@ -121,7 +126,10 @@ function nextFreeNumber() {
 
 function openEditor(channel) {
   editor.channel = channel;
-  editor.cats = channel ? channel.categories.map((c) => ({ ...c })) : [{ label: "Dibujos animados" }];
+  editor.cats = channel
+    ? channel.categories.map((c) => ({ ...c, programs: (c.programs || []).map((p) => ({ ...p })) }))
+    : [{ label: "Dibujos animados", programs: [] }];
+  editor.pautas = channel ? (channel.pautas || []).map((x) => ({ ...x })) : [];
   $("ch-editor-title").textContent = channel ? `Editar: ${channel.long_name}` : "Nuevo canal";
   $("ch-name").value = channel ? channel.long_name : "";
   $("ch-number").value = channel ? channel.number : nextFreeNumber();
@@ -134,6 +142,8 @@ function openEditor(channel) {
   $("ch-ads-field").hidden = !scheduled;
   $("ch-logo-field").hidden = !channel;
   $("ch-new-note").hidden = !!channel;
+  $("ch-parental-field").hidden = !channel;
+  $("ch-parental").checked = !!(channel && channel.parental);
   if (scheduled) {
     const ads = channel.ads || { enabled: false, strategy: "end", duration: 120 };
     $("ch-ads-on").checked = ads.enabled;
@@ -161,35 +171,80 @@ function editorType() {
   return editor.channel ? editor.channel.type : document.querySelector('input[name="ch-type"]:checked').value;
 }
 
+function nameInput(item, label) {
+  const input = el("input", { type: "text", maxlength: "30", value: item.label, "aria-label": label });
+  input.addEventListener("input", () => { item.label = input.value; });
+  return input;
+}
+
 function renderCats() {
-  $("ch-cats-field").hidden = editorType() !== "standard";
+  const type = editorType();
+  $("ch-cats-field").hidden = type === "loop";
+  if (!editor.channel && type === "music" && editor.cats.length === 1 && editor.cats[0].label === "Dibujos animados") {
+    editor.cats = [{ label: "Videos musicales", programs: [] }];
+  } else if (!editor.channel && type === "standard" && editor.cats.length === 1 && editor.cats[0].label === "Videos musicales") {
+    editor.cats = [{ label: "Dibujos animados", programs: [] }];
+  }
   $("ch-cats").replaceChildren(...editor.cats.map((cat, i) => {
-    const input = el("input", { type: "text", maxlength: "30", value: cat.label, "aria-label": "Nombre de la categoría" });
-    input.addEventListener("input", () => { cat.label = input.value; });
     const swatch = el("span", { class: "swatch" });
     swatch.style.background = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
-    return el("li", {}, swatch, input,
-      el("button", { class: "btn small danger", "aria-label": `Quitar ${cat.label}`,
-        onclick: () => { editor.cats.splice(i, 1); renderCats(); } }, "✕"));
+    const li = el("li", { class: "cat-item" },
+      el("div", { class: "cat-row" }, swatch, nameInput(cat, "Nombre de la categoría"),
+        el("button", { class: "btn small danger", type: "button", "aria-label": `Quitar ${cat.label}`,
+          onclick: () => { editor.cats.splice(i, 1); renderCats(); } }, "✕")));
+    if (editor.channel) {
+      const progs = el("ul", { class: "prog-list" }, ...cat.programs.map((p, j) => el("li", {},
+        el("span", { class: "muted" }, "↳"), nameInput(p, "Nombre del programa"),
+        el("button", { class: "btn small danger", type: "button", "aria-label": `Quitar ${p.label}`,
+          onclick: () => { cat.programs.splice(j, 1); renderCats(); } }, "✕"))));
+      const add = el("input", { type: "text", maxlength: "30", placeholder: "＋ Programa (ej: Bluey)" });
+      const addIt = () => { const v = add.value.trim(); if (v) { cat.programs.push({ label: v }); renderCats(); } };
+      add.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIt(); } });
+      add.addEventListener("change", addIt);
+      progs.append(el("li", { class: "prog-add" }, el("span", { class: "muted" }, "↳"), add));
+      li.append(progs);
+    }
+    return li;
   }));
+  renderPautas();
+}
+
+function renderPautas() {
+  $("ch-pautas").replaceChildren(...editor.pautas.map((pa, i) => el("li", {},
+    el("span", { class: "swatch" }, "📺"), nameInput(pa, "Nombre de la pauta"),
+    el("button", { class: "btn small danger", type: "button", "aria-label": `Quitar ${pa.label}`,
+      onclick: () => { editor.pautas.splice(i, 1); renderPautas(); } }, "✕"))));
+}
+
+function addPauta() {
+  const label = $("ch-pauta-new").value.trim();
+  if (!label) return;
+  editor.pautas.push({ label });
+  $("ch-pauta-new").value = "";
+  renderPautas();
 }
 
 function addCat() {
   const label = $("ch-cat-new").value.trim();
   if (!label) return;
-  editor.cats.push({ label });
+  editor.cats.push({ label, programs: [] });
   $("ch-cat-new").value = "";
   renderCats();
 }
 
 async function saveChannel() {
-  const categories = editor.cats.map((c) => (c.tag ? { tag: c.tag, label: c.label } : c.label));
+  const named = (x) => (x.tag ? { tag: x.tag, label: x.label } : x.label);
+  const categories = editor.cats.map((c) => ({
+    ...(c.tag ? { tag: c.tag } : {}), label: c.label, programs: (c.programs || []).map(named),
+  }));
   const body = { long_name: $("ch-name").value, number: Number($("ch-number").value) };
   $("ch-msg").textContent = "";
   try {
     if (editor.channel) {
+      body.parental = $("ch-parental").checked;
       if (editor.channel.type === "standard") {
         body.categories = categories;
+        body.pautas = editor.pautas.map(named);
         body.ads = {
           enabled: $("ch-ads-on").checked,
           strategy: $("ch-ads-strategy").value,
@@ -201,7 +256,7 @@ async function saveChannel() {
       toast("Canal guardado");
     } else {
       body.type = editorType();
-      if (body.type === "standard") body.categories = categories;
+      if (body.type !== "loop") body.categories = editor.cats.map((c) => c.label);
       await api("/api/channels", { json: body });
       toast("Canal creado. La tele se reinicia en unos segundos.");
     }
@@ -292,6 +347,8 @@ function wireManagement() {
   $("ch-save").addEventListener("click", saveChannel);
   $("ch-delete").addEventListener("click", deleteChannel);
   $("ch-cat-add").addEventListener("click", addCat);
+  $("ch-pauta-add").addEventListener("click", addPauta);
+  $("ch-pauta-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addPauta(); } });
   $("ch-cat-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCat(); } });
   document.querySelectorAll('input[name="ch-type"]').forEach((r) => r.addEventListener("change", renderCats));
   $("ch-ads-on").addEventListener("change", (e) => { $("ch-ads-opts").hidden = !e.target.checked; });

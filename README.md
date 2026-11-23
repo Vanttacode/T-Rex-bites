@@ -104,6 +104,19 @@ Para tenerlo como app en el teléfono, en el navegador usa
 | 📤 **Subir** | Subir videos a un canal y categoría (con barra de progreso) |
 | 📚 **Programas** | Ver y borrar los videos de cada canal |
 | 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y acceso al editor de programación |
+| ☰ **Más** | **WiFi**, **canales** (categorías y programas, **comerciales**, pautas, **logo**, PIN), **opciones de la tele**, **canal guía**, **respaldo**, **actualizaciones**, **qué se vio**, PIN y opciones avanzadas |
+
+**Novedades de la versión 0.5:**
+
+- 📂 **Programas dentro de categorías**: "Dibujos animados → Bluey". Un bloque puede pasar toda la categoría al azar o un programa específico, en orden.
+- 📺 **Pautas comerciales**: tandas propias por bloque (ej: "Juguetes" en la tarde) y comerciales que salen solo en un **momento** (mañana, noche, un día o un mes, ej: diciembre).
+- 📌 **Videos fijos** al empezar o terminar un bloque, y 🎬 **cortinillas** propias entre programas.
+- 📡 **Estática** al cambiar de canal, 🗒 **canal guía** estilo cable y 🎵 **canal de música**.
+- 🔒 **Canales con PIN**: la tele pide un PIN (se escribe desde el control del teléfono).
+- ⚙️ **Conversión automática** de videos pesados y 🔊 **volumen parejo** en todos.
+- 💾 **Importar desde pendrive** conectado a la tele, 📚 biblioteca con miniaturas, duración, búsqueda, repetidos y mover videos.
+- 💾 **Respaldo** de toda la configuración (descargar y restaurar).
+- 📱 **Ver un canal en otro aparato** (teléfono, tablet, otra tele) en `http://trexbites.local/ver`, sincronizado con la programación.
 
 ### Editor de programación (en el computador)
 
@@ -118,7 +131,6 @@ programa es un bloque de color.
   y estilo de la tanda de comerciales.
 - **Herramientas:** copiar un día a otros, programación al azar, duplicar el canal
   (con los mismos videos o con videos propios), deshacer/rehacer y guardar (Ctrl+S).
-| ☰ **Más** | **WiFi**, **canales** (categorías, **comerciales** y **logo**), **actualizaciones**, **qué se vio** cada día, PIN y opciones avanzadas |
 
 ---
 
@@ -190,4 +202,4 @@ TREXBITES_FS42_DIR=/tmp/fs42 TREXBITES_STATE=/tmp/fs42/panel.json uvicorn trexbi
 
 ## Estado
 
-Primera versión (base). Ver [docs/ROADMAP.md](docs/ROADMAP.md) para lo que falta.
+Versión 0.5 (beta). Ver [docs/ROADMAP.md](docs/ROADMAP.md) para lo que falta.

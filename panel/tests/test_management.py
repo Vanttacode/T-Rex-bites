@@ -44,7 +44,8 @@ def test_create_scheduled_channel(env):
     assert [cat["tag"] for cat in ch["categories"]] == ["peliculas", "musica_infantil"]
     assert ch["blocks"]["sunday"][0] == {"start": 7, "end": 20, "kind": "show", "tags": ["peliculas"],
                                         "mode": "random", "breaks": None,
-                                        "min_minutes": None, "max_minutes": None}
+                                        "min_minutes": None, "max_minutes": None,
+                                        "pauta": None, "start_video": None, "end_video": None}
     # empty category folders get the sample clip so the TV always has something to show
     folder = env["fs42"] / "catalog" / "canalpeliculas" / "musica_infantil"
     assert (folder / "_bienvenida_trexbites.mp4").exists()
@@ -95,9 +96,9 @@ def test_edit_channel_name_number_and_categories(env):
     assert resp.status_code == 200, resp.text
     ch = channels_by_name(c)["TRexTV"]
     assert (ch["long_name"], ch["number"]) == ("T-Rex Kids", 4)
-    assert ch["categories"][-1] == {"tag": "cuentos", "label": "Cuentos"}
+    assert ch["categories"][-1] == {"tag": "cuentos", "label": "Cuentos", "programs": []}
     # renaming a category keeps its tag (and its videos); new categories get a folder
-    assert ch["categories"][1] == {"tag": "dibujos", "label": "Dibujitos"}
+    assert ch["categories"][1] == {"tag": "dibujos", "label": "Dibujitos", "programs": []}
     assert (env["fs42"] / "catalog" / "trex_tv" / "cuentos" / "_bienvenida_trexbites.mp4").exists()
     assert env["rebuilds"] == [("TRexTV", True)]
 
@@ -265,8 +266,9 @@ def test_scheduled_channels_get_a_bump_folder(env):
     conf = json.loads((env["fs42"] / "confs" / "Cuentos.json").read_text())["station_conf"]
     assert conf["bump_dir"] == "bumps"
     assert (env["fs42"] / "catalog" / "cuentos" / "bumps" / "_ident_trexbites.mp4").exists()
-    # the bump folder is not a category people upload to
-    assert [f["tag"] for f in channels_by_name(c)["Cuentos"]["folders"]] == ["cuentos"]
+    # cortinillas (bumps) and fixed videos are their own upload folders, not categories
+    assert [f["tag"] for f in channels_by_name(c)["Cuentos"]["folders"]] == ["cuentos", "_cortinillas", "_fijos"]
+    assert [cat["tag"] for cat in channels_by_name(c)["Cuentos"]["categories"]] == ["cuentos"]
     assert c.post("/api/channels", json={"long_name": "X", "number": 10, "categories": ["Bumps"]}).status_code == 400
 
 

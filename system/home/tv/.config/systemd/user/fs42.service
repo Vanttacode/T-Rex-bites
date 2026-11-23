@@ -7,7 +7,10 @@ PartOf=graphical-session.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/trexbites/fieldstation42
-ExecStart=/opt/trexbites/fieldstation42/env/bin/python3 field_player.py
+# channel change effect chosen in the panel (long = static, short, none)
+Environment=TREX_TRANSITION=long
+EnvironmentFile=-/var/lib/trexbites/player.env
+ExecStart=/opt/trexbites/fieldstation42/env/bin/python3 field_player.py --transition ${TREX_TRANSITION}
 Restart=always
 RestartSec=5
 

@@ -16,16 +16,16 @@
 - [ ] Instalar en el notebook Lenovo y anotar qué falla (WiFi, video, sonido).
 - [x] Mostrar en la tele la IP del equipo cuando `trexbites.local` no funcione.
 - [x] Configurar y cambiar la red WiFi desde el teléfono (red "T-Rex Bites Config" + portal cautivo).
-- [ ] Convertir automáticamente los videos pesados a un formato liviano
-      (H.264 720p) para equipos lentos.
+- [x] Convertir automáticamente los videos pesados a un formato liviano
+      (H.264 720p) para equipos lentos, con volumen parejo.
 
 ## 🎨 Fase 3: look de los 2000
 
 - [x] Logo en la esquina (mosca de canal), propio por canal, y número de canal al cambiar.
 - [x] Comerciales propios por canal: al final, repartidos o a la mitad del programa.
-- [ ] Cortinillas y "bumpers" propios entre programas.
-- [ ] Estática y sonido al cambiar de canal.
-- [ ] Guía de programación con estilo cable de los 2000.
+- [x] Cortinillas y "bumpers" propios entre programas, y videos fijos al inicio o fin de un bloque.
+- [x] Estática y sonido al cambiar de canal.
+- [x] Guía de programación con estilo cable de los 2000 (canal guía) y canal de música.
 - [ ] Pantalla de "fin de transmisión" T-Rex.
 
 ## 👨‍👧 Fase 4: para padres
@@ -37,5 +37,19 @@
 - [x] Historial: qué pasó la tele cada día y cuántos minutos.
 - [x] Botón "Actualizar T-Rex Bites" en el panel (desde GitHub Releases) y actualizaciones de seguridad automáticas.
 - [ ] Límite diario de minutos (necesita un botón de encendido: control remoto físico).
-- [ ] Ver el canal en vivo desde el navegador (otra tele de la casa).
+- [x] Ver el canal en vivo desde el navegador (otra tele de la casa).
 - [ ] Imagen para Raspberry Pi.
+
+## ✅ Versión 0.5
+
+- [x] Programas dentro de categorías (Dibujos animados → Bluey).
+- [x] Pautas comerciales por bloque y comerciales por momento del día, día o mes.
+- [x] Canales con PIN.
+- [x] Importar desde pendrive, biblioteca con miniaturas, duración, búsqueda, repetidos y mover.
+- [x] Respaldo y restauración de la configuración.
+
+## 🔜 Después
+
+- [ ] Imagen para Raspberry Pi.
+- [ ] Versión programa (Linux y Windows), sin instalar un sistema.
+- [ ] Programación por fecha (feriados, cumpleaños).

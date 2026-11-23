@@ -50,8 +50,14 @@
         <button class="rbtn" data-remote="guide">📺 Guía</button>
         <button class="rbtn" data-remote="mute">🔇 Silencio</button>
       </div>
+      <div class="card" id="pin-pad-card" hidden>
+        <h2>🔒 Este canal pide PIN</h2>
+        <p class="muted small">Escribe el PIN de canales y aparece en la tele.</p>
+        <div class="keypad" id="tv-keypad"></div>
+      </div>
       <h3 class="section-title">Canales</h3>
       <div class="channel-list" id="channel-buttons"></div>
+      <a class="btn ghost wide" href="/ver">📱 Ver un canal en este aparato</a>
     </section>
 
     <!-- Upload -->
@@ -61,9 +67,18 @@
         <label class="field">Canal
           <select id="up-channel"></select>
         </label>
-        <label class="field">Categoría
+        <label class="field">Dónde
           <select id="up-tag"></select>
         </label>
+        <details class="field" id="up-when-box">
+          <summary>🕒 ¿Cuándo puede salir? <small id="up-when-sum">Siempre</small></summary>
+          <p class="muted small">Ideal para comerciales: el de cereales solo en la mañana, el de juguetes en diciembre.</p>
+          <div class="time-grid">
+            <label>Momento del día<select id="up-when-part"></select></label>
+            <label>Día<select id="up-when-day"></select></label>
+            <label>Mes<select id="up-when-month"></select></label>
+          </div>
+        </details>
         <label class="dropzone" id="dropzone">
           <input type="file" id="up-files" accept="video/*,.mkv,.avi,.mpg,.ts" multiple>
           <span>📼 Toca aquí o arrastra videos</span>
@@ -71,10 +86,33 @@
         <p class="muted" id="disk-info"></p>
       </div>
       <ul class="uploads" id="upload-list"></ul>
+
+      <div class="card" id="usb-card">
+        <div class="card-head">
+          <h2>💾 Importar desde pendrive</h2>
+          <button class="btn small ghost" id="usb-refresh">Buscar</button>
+        </div>
+        <p class="muted small">Conecta el pendrive al computador de la tele y toca "Buscar". Se copia directo, sin pasar por el teléfono.</p>
+        <div id="usb-drives"></div>
+        <div id="usb-browser" hidden>
+          <label class="switch"><input type="checkbox" id="usb-all"> Elegir todos</label>
+          <div id="usb-files" class="usb-files"></div>
+          <p class="muted small">Se copian al canal y lugar elegidos arriba.</p>
+          <div class="btn-row">
+            <button class="btn" id="usb-import">Copiar a la tele</button>
+            <button class="btn ghost" id="usb-eject">Expulsar</button>
+          </div>
+        </div>
+        <p class="power-line" id="usb-status"></p>
+      </div>
     </section>
 
     <!-- Library -->
     <section id="tab-library" class="tab" hidden>
+      <div class="card lib-tools">
+        <input type="search" id="lib-search" placeholder="🔎 Buscar un video">
+        <select id="lib-channel"></select>
+      </div>
       <div id="library"></div>
     </section>
 
@@ -146,9 +184,10 @@
           <legend>Tipo</legend>
           <label class="radio"><input type="radio" name="ch-type" value="standard" checked> 🗓 Con horario <small>(categorías por hora y fin de transmisión)</small></label>
           <label class="radio"><input type="radio" name="ch-type" value="loop"> 🔁 Todo el día <small>(repite sus videos sin parar)</small></label>
+          <label class="radio"><input type="radio" name="ch-type" value="music"> 🎵 Canal de música <small>(videos musicales seguidos, todo el día)</small></label>
         </fieldset>
         <div class="field" id="ch-cats-field">
-          Categorías
+          Categorías <small class="muted">y sus programas (ej: Dibujos animados → Bluey)</small>
           <ul class="cat-list" id="ch-cats"></ul>
           <div class="add-cat">
             <input type="text" id="ch-cat-new" maxlength="30" placeholder="Nueva categoría (ej: Cuentos)">
@@ -174,7 +213,16 @@
                 <option value="300">5 minutos</option>
               </select>
             </label>
-            <p class="muted small">Los comerciales se suben en <b>Subir</b>, eligiendo la categoría "📺 Comerciales".</p>
+            <p class="muted small">Los comerciales se suben en <b>Subir</b>, eligiendo "📺 Comerciales".</p>
+            <div class="field">
+              Pautas <small class="muted">(tandas propias para algunos bloques, ej: "Juguetes" para la tarde)</small>
+              <ul class="cat-list" id="ch-pautas"></ul>
+              <div class="add-cat">
+                <input type="text" id="ch-pauta-new" maxlength="30" placeholder="Nueva pauta (ej: Juguetes)">
+                <button class="btn small ghost" id="ch-pauta-add" type="button">Agregar</button>
+              </div>
+              <p class="muted small">En el editor de programación eliges qué pauta usa cada bloque.</p>
+            </div>
           </div>
         </div>
         <div class="field" id="ch-logo-field" hidden>
@@ -189,6 +237,7 @@
           <label class="switch"><input type="checkbox" id="ch-logo-show"> Mostrar logo en pantalla</label>
           <label class="switch"><input type="checkbox" id="ch-logo-permanent"> Siempre visible (si no, aparece unos segundos)</label>
         </div>
+        <label class="switch" id="ch-parental-field" hidden><input type="checkbox" id="ch-parental"> 🔒 Pedir PIN para ver este canal <small>(se configura en "Opciones de la tele")</small></label>
         <p class="muted small" id="ch-new-note" hidden>Después de crear el canal podrás ponerle logo y comerciales.</p>
         <div class="btn-row">
           <button class="btn" id="ch-save">Guardar canal</button>
@@ -196,6 +245,45 @@
         </div>
         <button class="btn danger wide" id="ch-delete" hidden>Borrar este canal</button>
         <p class="error" id="ch-msg" role="status"></p>
+      </div>
+
+      <div class="card" id="tv-card">
+        <h2>📺 Opciones de la tele</h2>
+        <label class="field">Al cambiar de canal
+          <select id="tv-transition"></select>
+        </label>
+        <label class="switch"><input type="checkbox" id="tv-convert"> Convertir videos pesados automáticamente <small>(para que no se traben y se vean en el teléfono)</small></label>
+        <label class="switch"><input type="checkbox" id="tv-normalize"> Volumen parejo en todos los videos</label>
+        <button class="btn small ghost" id="tv-convert-all">Aplicar a los videos que ya están</button>
+        <p class="muted small" id="tv-converting"></p>
+        <label class="field">PIN de canales (4 números) <input type="password" inputmode="numeric" maxlength="4" id="tv-pin" placeholder="Sin PIN" autocomplete="off"></label>
+        <p class="muted small">Los canales marcados "Pedir PIN" muestran un candado en la tele hasta que se escriba este PIN (desde el control remoto del teléfono).</p>
+        <button class="btn" id="tv-save">Guardar opciones</button>
+        <p class="error" id="tv-msg" role="status"></p>
+      </div>
+
+      <div class="card" id="guide-card">
+        <h2>🗒 Canal guía</h2>
+        <p class="muted small">Un canal con la grilla de lo que pasa cada canal ahora y después, como el cable de los 2000.</p>
+        <label class="switch"><input type="checkbox" id="guide-on"> Tener canal guía</label>
+        <label class="field">Número <input type="number" id="guide-number" min="1" max="99" inputmode="numeric"></label>
+        <div class="field">
+          Música de fondo (MP3)
+          <ul class="cat-list" id="guide-music"></ul>
+          <label class="btn small ghost">＋ Subir MP3<input type="file" id="guide-music-file" accept=".mp3,audio/mpeg" hidden></label>
+        </div>
+        <button class="btn" id="guide-save">Guardar guía</button>
+        <p class="error" id="guide-msg" role="status"></p>
+      </div>
+
+      <div class="card">
+        <h2>💾 Respaldo</h2>
+        <p class="muted small">Guarda canales, programación, comerciales, logos y horarios en un archivo. Los videos no van incluidos.</p>
+        <div class="btn-row">
+          <a class="btn" href="/api/backup" download>Descargar respaldo</a>
+          <label class="btn ghost">Restaurar…<input type="file" id="backup-file" accept=".zip,application/zip" hidden></label>
+        </div>
+        <p class="error" id="backup-msg" role="status"></p>
       </div>
 
       <div class="card">
@@ -246,5 +334,6 @@
   <script src="/static/manage.js"></script>
   <script src="/static/wifi.js"></script>
   <script src="/static/updates.js"></script>
+  <script src="/static/extras.js"></script>
 </body>
 </html>
