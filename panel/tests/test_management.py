@@ -3,115 +3,115 @@ import json
 
 from conftest import login
 
+DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
 
 def channels_by_name(client):
     return {c["name"]: c for c in client.get("/api/channels").json()["channels"]}
+
+
+def conf_file(env, name):
+    for path in (env["fs42"] / "confs").glob("*.json"):
+        data = json.loads(path.read_text())
+        if data.get("station_conf", {}).get("network_name") == name:
+            return data["station_conf"]
+    raise AssertionError(name)
+
+
+def lib(env, *parts):
+    return env["fs42"].joinpath("catalog", "biblioteca", *parts)
+
+
+def block(start, end, tags, **extra):
+    return {"start": start, "end": end, "kind": "show", "tags": tags, **extra}
 
 
 def test_management_requires_pin(env):
     c = env["client"]
     assert c.post("/api/channels", json={"long_name": "X", "number": 7}).status_code == 401
     assert c.put("/api/channels/TRexTV/schedule", json={"blocks": {}}).status_code == 401
+    assert c.put("/api/library", json={"categories": []}).status_code == 401
     assert c.get("/api/bedtime").status_code == 401
     assert c.post("/api/power", json={"mode": "off"}).status_code == 401
     assert c.get("/api/history").status_code == 401
 
 
-def test_channels_expose_categories_and_schedule(env):
+def test_create_schedule_channel(env):
     c = env["client"]
     login(c)
-    trex = channels_by_name(c)["TRexTV"]
-    assert [cat["label"] for cat in trex["categories"]] == ["Mañana", "Dibujos animados", "Educativos", "Películas"]
-    monday = trex["blocks"]["monday"]
-    assert (monday[0]["start"], monday[0]["end"], monday[0]["tags"]) == (7, 10, ["manana"])
-    assert monday[-1] == {"start": 20, "end": 21, "kind": "signoff"}
-    assert channels_by_name(c)["DinoLoop"]["blocks"] is None
-
-
-def test_create_scheduled_channel(env):
-    c = env["client"]
-    login(c)
-    resp = c.post("/api/channels", json={
-        "long_name": "Canal Películas", "number": 7, "type": "standard",
-        "categories": ["Películas", "Música infantil"],
-    })
+    resp = c.post("/api/channels", json={"long_name": "Canal Películas", "number": 7, "kind": "schedule",
+                                         "tags": ["peliculas"]})
     assert resp.status_code == 200, resp.text
     name = resp.json()["name"]
     assert name == "CanalPeliculas"
-
     ch = channels_by_name(c)[name]
-    assert ch["long_name"] == "Canal Películas"
-    assert [cat["tag"] for cat in ch["categories"]] == ["peliculas", "musica_infantil"]
-    assert ch["blocks"]["sunday"][0] == {"start": 7, "end": 20, "kind": "show", "tags": ["peliculas"],
-                                        "mode": "random", "breaks": None,
-                                        "min_minutes": None, "max_minutes": None,
-                                        "pauta": None, "start_video": None, "end_video": None}
-    # empty category folders get the sample clip so the TV always has something to show
-    folder = env["fs42"] / "catalog" / "canalpeliculas" / "musica_infantil"
-    assert (folder / "_bienvenida_trexbites.mp4").exists()
-    # new channels need the player restarted
+    assert ch["kind"] == "schedule"
+    assert ch["blocks"]["sunday"][0]["tags"] == ["peliculas"]
+    conf = conf_file(env, name)
+    assert conf["content_dir"] == "catalog/biblioteca"
+    assert conf["bump_dir"] == "canales/canalpeliculas/bumps"
+    # the channel's own folders exist before FieldStation42 sees the channel
+    assert lib(env, "canales", "canalpeliculas", "bumps", "_ident_trexbites.mp4").exists()
+    assert lib(env, "peliculas", "_bienvenida_trexbites.mp4").exists()
     assert env["rebuilds"] == [(name, True)]
 
 
-def test_create_loop_channel(env):
+def test_create_allday_channel_with_a_program(env):
     c = env["client"]
     login(c)
-    resp = c.post("/api/channels", json={"long_name": "Música", "number": 8, "type": "loop"})
-    assert resp.status_code == 200
-    ch = channels_by_name(c)["Musica"]
-    assert ch["type"] == "loop"
-    assert ch["folders"][0]["tag"] is None
+    tree = c.get("/api/channels").json()["library"]["categories"]
+    tree[4]["programs"] = ["Oliver Tree"]
+    assert c.put("/api/library", json={"categories": tree}).status_code == 200
+    resp = c.post("/api/channels", json={"long_name": "Oliver TV", "number": 13, "kind": "allday",
+                                         "tags": ["videos_musicales/oliver_tree"], "mode": "order"})
+    assert resp.status_code == 200, resp.text
+    ch = channels_by_name(c)["OliverTv"]
+    assert ch["allday"] == {"tags": ["videos_musicales/oliver_tree"], "mode": "order"}
+    conf = conf_file(env, "OliverTv")
+    assert conf["schedule_increment"] == 0
+    assert all(str(h) in conf["monday"] for h in range(24))
+    assert conf["monday"]["0"]["sequence"] == "orden-videos_musicales-oliver_tree"
+    # change what it plays
+    r = c.put("/api/channels/OliverTv", json={"long_name": "Oliver TV", "number": 13,
+                                              "allday": {"tags": ["videos_musicales"], "mode": "random"}})
+    assert r.status_code == 200
+    assert channels_by_name(c)["OliverTv"]["allday"] == {"tags": ["videos_musicales"], "mode": "random"}
+    # an all-day channel has no timeline
+    assert c.put("/api/channels/OliverTv/schedule", json={"blocks": {}}).status_code == 400
 
 
 def test_create_channel_validation(env):
     c = env["client"]
     login(c)
-    taken = c.post("/api/channels", json={"long_name": "Otro", "number": 3, "categories": ["A"]})
-    assert taken.status_code == 400
-    assert "T-Rex TV" in taken.json()["detail"]
-    assert c.post("/api/channels", json={"long_name": "", "number": 9, "categories": ["A"]}).status_code == 400
-    assert c.post("/api/channels", json={"long_name": "X", "number": 100, "categories": ["A"]}).status_code == 400
-    assert c.post("/api/channels", json={"long_name": "X", "number": 9, "categories": []}).status_code == 400
-    assert c.post("/api/channels", json={"long_name": "X", "number": 9, "categories": ["A", "a"]}).status_code == 400
-    assert c.post("/api/channels", json={"long_name": "X", "number": 9, "type": "web"}).status_code == 400
-    assert env["stations"].calls == []
+    ok = {"long_name": "Nuevo", "number": 8, "kind": "schedule", "tags": ["dibujos"]}
+    assert c.post("/api/channels", json={**ok, "long_name": "  "}).status_code == 400
+    assert c.post("/api/channels", json={**ok, "number": 3}).status_code == 400   # taken
+    assert c.post("/api/channels", json={**ok, "number": 100}).status_code == 400
+    assert c.post("/api/channels", json={**ok, "kind": "music"}).status_code == 400
+    assert c.post("/api/channels", json={**ok, "tags": []}).status_code == 400
+    assert c.post("/api/channels", json={**ok, "tags": ["nope"]}).status_code == 400
+    assert c.post("/api/channels", json={**ok, "kind": "allday", "tags": ["dibujos", "peliculas"],
+                                         "mode": "order"}).status_code == 400
 
 
 def test_same_name_gets_unique_id(env):
     c = env["client"]
     login(c)
-    first = c.post("/api/channels", json={"long_name": "Dino Loop", "number": 9, "type": "loop"})
-    assert first.json()["name"] == "DinoLoop2"
+    a = c.post("/api/channels", json={"long_name": "Dibus", "number": 8, "tags": ["dibujos"]}).json()["name"]
+    b = c.post("/api/channels", json={"long_name": "Dibus", "number": 9, "tags": ["dibujos"]}).json()["name"]
+    assert a != b
+    assert conf_file(env, a)["bump_dir"] != conf_file(env, b)["bump_dir"]
 
 
-def test_edit_channel_name_number_and_categories(env):
+def test_edit_channel_name_and_number(env):
     c = env["client"]
     login(c)
-    resp = c.put("/api/channels/TRexTV", json={
-        "long_name": "T-Rex Kids", "number": 4,
-        "categories": [{"tag": "manana", "label": "Mañana"}, {"tag": "dibujos", "label": "Dibujitos"},
-                       {"tag": "educativo", "label": "Educativos"}, {"tag": "peliculas", "label": "Películas"},
-                       "Cuentos"],
-    })
+    resp = c.put("/api/channels/TRexTV", json={"long_name": "T-Rex Kids", "number": 4})
     assert resp.status_code == 200, resp.text
     ch = channels_by_name(c)["TRexTV"]
     assert (ch["long_name"], ch["number"]) == ("T-Rex Kids", 4)
-    assert ch["categories"][-1] == {"tag": "cuentos", "label": "Cuentos", "programs": []}
-    # renaming a category keeps its tag (and its videos); new categories get a folder
-    assert ch["categories"][1] == {"tag": "dibujos", "label": "Dibujitos", "programs": []}
-    assert (env["fs42"] / "catalog" / "trex_tv" / "cuentos" / "_bienvenida_trexbites.mp4").exists()
     assert env["rebuilds"] == [("TRexTV", True)]
-
-
-def test_category_in_schedule_cannot_be_removed(env):
-    c = env["client"]
-    login(c)
-    resp = c.put("/api/channels/TRexTV", json={
-        "long_name": "T-Rex TV", "number": 3, "categories": [{"tag": "manana", "label": "Mañana"}, {"tag": "dibujos", "label": "Dibujos"},
-                                                       {"tag": "peliculas", "label": "Películas"}],
-    })
-    assert resp.status_code == 400
-    assert "Educativos" in resp.json()["detail"]
+    assert c.put("/api/channels/TRexTV", json={"long_name": "X", "number": 5}).status_code == 400
 
 
 def test_edit_without_number_change_does_not_restart(env):
@@ -124,22 +124,18 @@ def test_edit_without_number_change_does_not_restart(env):
 def test_delete_channel_keeps_videos(env):
     c = env["client"]
     login(c)
-    c.post("/api/upload", data={"channel": "DinoLoop"}, files={"file": ("a.mp4", b"x", "video/mp4")})
+    c.post("/api/upload", data={"tag": "dibujos"}, files={"file": ("a.mp4", b"x", "video/mp4")})
     assert c.delete("/api/channels/DinoLoop").status_code == 200
     assert "DinoLoop" not in channels_by_name(c)
-    assert (env["fs42"] / "catalog" / "dino_loop" / "a.mp4").exists()
+    assert lib(env, "dibujos", "a.mp4").exists()
     assert env["restarts"] == [True]
     assert c.delete("/api/channels/DinoLoop").status_code == 404
-
-
-def block(start, end, tags, **extra):
-    return {"start": start, "end": end, "kind": "show", "tags": tags, **extra}
 
 
 def test_save_blocks(env):
     c = env["client"]
     login(c)
-    week = {day: [] for day in ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")}
+    week = {day: [] for day in DAYS}
     week["saturday"] = [
         block(9, 12, ["dibujos"], mode="order", breaks="end", max_minutes=30),
         block(12, 14, ["dibujos", "peliculas"]),
@@ -148,7 +144,7 @@ def test_save_blocks(env):
     resp = c.put("/api/channels/TRexTV/schedule", json={"blocks": week})
     assert resp.status_code == 200, resp.text
 
-    saved = json.loads((env["fs42"] / "confs" / "trex_tv.json").read_text())["station_conf"]
+    saved = conf_file(env, "TRexTV")
     assert saved["monday"] == {}
     sat = saved["saturday"]
     assert sat["9"] == {"tags": "dibujos", "sequence": "orden-dibujos", "break_strategy": "end", "max_duration": 30}
@@ -156,13 +152,9 @@ def test_save_blocks(env):
     assert sat["12"] == {"tags": ["dibujos", "peliculas"], "random_tags": True}
     assert sat["20"] == {"event": "signoff"} and "21" not in sat
 
-    # read back as the same blocks
     blocks = channels_by_name(c)["TRexTV"]["blocks"]["saturday"]
     assert [(b["start"], b["end"], b["kind"]) for b in blocks] == [(9, 12, "show"), (12, 14, "show"), (20, 21, "signoff")]
     assert blocks[0]["mode"] == "order" and blocks[0]["max_minutes"] == 30
-    # categories survive even when the schedule no longer uses them
-    assert [cat["tag"] for cat in channels_by_name(c)["TRexTV"]["categories"]] == \
-        ["manana", "dibujos", "educativo", "peliculas"]
     assert env["rebuilds"] == [("TRexTV", False)]
 
 
@@ -180,44 +172,85 @@ def test_block_validation(env):
     assert put([block(9, 10, ["dibujos"], breaks="nunca")]).status_code == 400
     assert put([block(9, 10, ["dibujos"], min_minutes=40, max_minutes=20)]).status_code == 400
     assert put([block(9, 10, [])]).status_code == 400
-    assert c.put("/api/channels/DinoLoop/schedule", json={"blocks": {}}).status_code == 400
     assert c.put("/api/channels/Nope/schedule", json={"blocks": {}}).status_code == 400
 
 
 def test_duplicate_channel(env):
     c = env["client"]
     login(c)
+    c.post("/api/channels/TRexTV/logo", files={"file": ("l.png", b"\x89PNG", "image/png")})
     resp = c.post("/api/channels/TRexTV/duplicate", json={"long_name": "T-Rex Fin de semana", "number": 4})
     assert resp.status_code == 200, resp.text
-    copy = channels_by_name(c)[resp.json()["name"]]
-    orig = channels_by_name(c)["TRexTV"]
+    name = resp.json()["name"]
+    copy, orig = channels_by_name(c)[name], channels_by_name(c)["TRexTV"]
     assert copy["number"] == 4 and copy["long_name"] == "T-Rex Fin de semana"
-    assert copy["blocks"] == orig["blocks"] and copy["categories"] == orig["categories"]
-    # same videos by default
-    conf = json.loads((env["fs42"] / "confs" / f"{resp.json()['name']}.json").read_text())["station_conf"]
-    assert conf["content_dir"] == "catalog/trex_tv"
-    assert env["rebuilds"][-1] == (resp.json()["name"], True)
-
-    own = c.post("/api/channels/TRexTV/duplicate", json={"long_name": "Otro", "number": 6, "share_videos": False})
-    conf = json.loads((env["fs42"] / "confs" / f"{own.json()['name']}.json").read_text())["station_conf"]
-    assert conf["content_dir"] == "catalog/otro"
-    assert (env["fs42"] / "catalog" / "otro" / "dibujos" / "_bienvenida_trexbites.mp4").exists()
-    taken = c.post("/api/channels/TRexTV/duplicate", json={"long_name": "X", "number": 3})
-    assert taken.status_code == 400
+    assert copy["blocks"] == orig["blocks"]
+    conf = conf_file(env, name)
+    assert conf["content_dir"] == "catalog/biblioteca"
+    assert conf["bump_dir"] == f"canales/{name.lower()}/bumps"
+    assert conf["logo_dir"] == f"canales/{name.lower()}/logos"
+    assert lib(env, "canales", name.lower(), "logos", "logo.png").read_bytes() == b"\x89PNG"
+    assert c.post("/api/channels/TRexTV/duplicate", json={"long_name": "X", "number": 3}).status_code == 400
 
 
-def test_upload_replaces_sample_clip_and_delete_restores_it(env):
+def test_library_categories_and_programs(env):
     c = env["client"]
     login(c)
-    c.post("/api/channels", json={"long_name": "Cuentos", "number": 9, "type": "loop"})
-    folder = env["fs42"] / "catalog" / "cuentos"
-    assert (folder / "_bienvenida_trexbites.mp4").exists()
+    tree = c.get("/api/channels").json()["library"]["categories"]
+    tree[1]["label"] = "Dibujitos"
+    tree[1]["programs"] = ["Bluey", "Peppa"]
+    tree.append("Cuentos")
+    r = c.put("/api/library", json={"categories": tree})
+    assert r.status_code == 200, r.text
+    data = c.get("/api/channels").json()["library"]
+    cats = {x["tag"]: x for x in data["categories"]}
+    assert cats["dibujos"]["label"] == "Dibujitos"
+    assert [p["tag"] for p in cats["dibujos"]["programs"]] == ["bluey", "peppa"]
+    assert "dibujos/bluey" in [x["tag"] for x in data["content"]]
+    assert lib(env, "dibujos", "bluey", "_bienvenida_trexbites.mp4").exists()
+    assert lib(env, "cuentos").is_dir()
+    # reserved names (hint folders, the channels folder) are refused
+    bad = data["categories"] + ["Monday"]
+    assert c.put("/api/library", json={"categories": bad}).status_code == 400
+    bad = data["categories"] + ["Canales"]
+    assert c.put("/api/library", json={"categories": bad}).status_code == 400
 
-    c.post("/api/upload", data={"channel": "Cuentos"}, files={"file": ("uno.mp4", b"x", "video/mp4")})
-    assert sorted(p.name for p in folder.iterdir()) == ["uno.mp4"]
 
-    c.post("/api/library/delete", json={"channel": "Cuentos", "name": "uno.mp4"})
-    assert sorted(p.name for p in folder.iterdir()) == ["_bienvenida_trexbites.mp4"]
+def test_library_category_in_use_or_with_videos_cannot_be_removed(env):
+    c = env["client"]
+    login(c)
+    tree = c.get("/api/channels").json()["library"]["categories"]
+    without_dibujos = [x for x in tree if x["tag"] != "dibujos"]
+    r = c.put("/api/library", json={"categories": without_dibujos})
+    assert r.status_code == 400 and "canal" in r.json()["detail"]
+    c.post("/api/upload", data={"tag": "videos_musicales"}, files={"file": ("a.mp4", b"x", "video/mp4")})
+    without_music = [x for x in tree if x["tag"] != "videos_musicales"]
+    r = c.put("/api/library", json={"categories": without_music})
+    assert r.status_code == 400 and "videos" in r.json()["detail"]
+    c.post("/api/library/delete", json={"tag": "videos_musicales", "name": "a.mp4"})
+    assert c.put("/api/library", json={"categories": without_music}).status_code == 200
+    assert not lib(env, "videos_musicales").exists()
+
+
+def test_move_and_delete_many(env):
+    c = env["client"]
+    login(c)
+    for n in ("a.mp4", "b.mp4", "c.mp4"):
+        c.post("/api/upload", data={"tag": "dibujos"}, files={"file": (n, b"x" + n.encode(), "video/mp4")})
+    tree = c.get("/api/channels").json()["library"]["categories"]
+    tree[4]["programs"] = ["Oliver Tree"]
+    c.put("/api/library", json={"categories": tree})
+    items = [{"tag": "dibujos", "name": "a.mp4"}, {"tag": "dibujos", "name": "b.mp4"}]
+    r = c.post("/api/library/move-many", json={"items": items, "to_tag": "videos_musicales/oliver_tree"})
+    assert r.status_code == 200 and r.json()["moved"] == 2
+    assert lib(env, "videos_musicales", "oliver_tree", "a.mp4").exists()
+    assert not lib(env, "videos_musicales", "oliver_tree", "_bienvenida_trexbites.mp4").exists()
+    r = c.post("/api/library/delete-many", json={"items": [{"tag": "dibujos", "name": "c.mp4"}]})
+    assert r.json()["deleted"] == 1
+    # the emptied category gets its sample clip back
+    assert lib(env, "dibujos", "_bienvenida_trexbites.mp4").exists()
+    bad = c.post("/api/library/move-many", json={"items": [{"tag": "dibujos", "name": "../x.mp4"}], "to_tag": "peliculas"})
+    assert bad.status_code == 404
 
 
 def test_bedtime_settings_roundtrip(env):
@@ -256,29 +289,3 @@ def test_history_endpoint(env):
     assert days[0]["total_minutes"] == 3
     assert days[0]["programs"][0] == {"channel": 3, "network": "TRexTV", "title": "Dinos",
                                       "minutes": 3, "channel_name": "T-Rex TV"}
-
-
-def test_scheduled_channels_get_a_bump_folder(env):
-    """FieldStation42 fills gaps between programs from bump_dir; without it schedules fail."""
-    c = env["client"]
-    login(c)
-    c.post("/api/channels", json={"long_name": "Cuentos", "number": 9, "categories": ["Cuentos"]})
-    conf = json.loads((env["fs42"] / "confs" / "Cuentos.json").read_text())["station_conf"]
-    assert conf["bump_dir"] == "bumps"
-    assert (env["fs42"] / "catalog" / "cuentos" / "bumps" / "_ident_trexbites.mp4").exists()
-    # cortinillas (bumps) and fixed videos are their own upload folders, not categories
-    assert [f["tag"] for f in channels_by_name(c)["Cuentos"]["folders"]] == ["cuentos", "_cortinillas", "_fijos"]
-    assert [cat["tag"] for cat in channels_by_name(c)["Cuentos"]["categories"]] == ["cuentos"]
-    assert c.post("/api/channels", json={"long_name": "X", "number": 10, "categories": ["Bumps"]}).status_code == 400
-
-
-def test_old_channel_without_bump_dir_is_repaired_on_save(env):
-    c = env["client"]
-    login(c)
-    path = env["fs42"] / "confs" / "trex_tv.json"
-    data = json.loads(path.read_text())
-    del data["station_conf"]["bump_dir"]
-    path.write_text(json.dumps(data))
-    c.put("/api/channels/TRexTV", json={"long_name": "T-Rex TV", "number": 3})
-    assert json.loads(path.read_text())["station_conf"]["bump_dir"] == "bumps"
-    assert (env["fs42"] / "catalog" / "trex_tv" / "bumps" / "_ident_trexbites.mp4").exists()

@@ -161,45 +161,78 @@ async function sendDigit(d) {
 
 // ---------- channels / upload ----------
 
+let libraryCache = { categories: [], content: [], folders: [] };
+
 async function loadChannels() {
   const data = await api("/api/channels");
   channelsCache = data.channels;
+  libraryCache = data.library;
   if (data.when && !whenOptions) { whenOptions = data.when; fillWhen(); }
   renderChannelButtons();
-  const sel = $("up-channel");
-  const previous = sel.value;
-  sel.replaceChildren(...channelsCache.map((c) => el("option", { value: c.name }, `${c.number} · ${c.long_name}`)));
-  if (previous) sel.value = previous;
-  fillTags();
+  fillDest();
+  showProblems(data.problems || {});
+  return data;
 }
 
-// upload destinations grouped: programs, commercials, channel extras
-function folderGroup(tag) {
-  if (tag === null) return "Videos";
-  if (tag === "_comerciales" || tag.startsWith("_pauta/")) return "Comerciales";
-  if (tag.startsWith("_")) return "Extras del canal";
-  return "Categorías y programas";
-}
-
-function folderOptions(ch, selected) {
-  const groups = new Map();
-  for (const f of ch ? ch.folders : []) {
-    const g = folderGroup(f.tag);
-    if (!groups.has(g)) groups.set(g, el("optgroup", { label: g }));
-    const label = f.tag && f.tag.includes("/") ? `   ↳ ${f.label.split(" › ").pop()}` : f.label;
-    const opt = el("option", { value: f.tag ?? "" }, label);
-    if ((f.tag ?? "") === selected) opt.selected = true;
-    groups.get(g).append(opt);
+function showProblems(problems) {
+  const names = Object.keys(problems);
+  let box = $("problems");
+  if (!names.length) { if (box) box.remove(); return; }
+  if (!box) {
+    box = el("div", { class: "card warning", id: "problems" });
+    $("tab-remote").prepend(box);
   }
-  return [...groups.values()];
+  const long = (n) => (channelsCache.find((c) => c.name === n) || { long_name: n }).long_name;
+  box.replaceChildren(el("b", {}, "⚠️ No se pudo armar la programación de: " + names.map(long).join(", ")),
+    el("br"), el("small", {}, "Revisa que tengan videos. Se reintenta solo al subir, mover o guardar."));
 }
 
-function fillTags() {
-  const ch = channelsCache.find((c) => c.name === $("up-channel").value);
-  const tagSel = $("up-tag");
-  const prev = tagSel.value;
-  tagSel.replaceChildren(...folderOptions(ch, prev));
-  tagSel.parentElement.hidden = !ch || (ch.folders.length === 1 && ch.folders[0].tag === null);
+// "where to upload": the library (shared) or one channel's own folders
+const destValue = (channel, tag) => `${channel || ""}|${tag ?? ""}`;
+function parseDest(value) {
+  const i = value.indexOf("|");
+  return { channel: value.slice(0, i) || null, tag: value.slice(i + 1) || null };
+}
+
+function destGroups(selected, includeChannels = true) {
+  const groups = [];
+  const lib = el("optgroup", { label: "📚 Biblioteca" });
+  for (const c of libraryCache.content) {
+    const program = c.tag.includes("/");
+    lib.append(el("option", { value: destValue(null, c.tag) }, program ? `   ↳ ${c.label.split(" › ").pop()}` : c.label));
+  }
+  groups.push(lib);
+  if (includeChannels) {
+    for (const ch of channelsCache) {
+      if (!ch.folders.length) continue;
+      const g = el("optgroup", { label: `📺 ${ch.number} · ${ch.long_name}` });
+      ch.folders.forEach((f) => g.append(el("option", { value: destValue(ch.name, f.tag) }, f.label)));
+      groups.push(g);
+    }
+  }
+  groups.forEach((g) => [...g.children].forEach((o) => { if (o.value === selected) o.selected = true; }));
+  return groups;
+}
+
+function destLabel(value) {
+  const { channel, tag } = parseDest(value);
+  if (!channel) return (libraryCache.content.find((c) => c.tag === tag) || { label: tag }).label;
+  const ch = channelsCache.find((c) => c.name === channel);
+  const f = ch && ch.folders.find((x) => x.tag === tag);
+  return ch ? `${ch.long_name} › ${f ? f.label : tag}` : value;
+}
+
+function fillDest() {
+  const sel = $("up-dest");
+  const prev = sel.value;
+  sel.replaceChildren(el("option", { value: "" }, "— Elige dónde —"), ...destGroups(prev));
+  updateDropLabel();
+}
+
+function updateDropLabel() {
+  const v = $("up-dest").value;
+  $("up-drop-label").textContent = v ? `📼 Subir a: ${destLabel(v)}` : "📼 Primero elige dónde guardarlo (arriba)";
+  $("dropzone").classList.toggle("disabled", !v);
 }
 
 function fillWhen() {
@@ -224,26 +257,27 @@ async function refreshDisk() {
 }
 
 function uploadFiles(files) {
-  const channel = $("up-channel").value;
-  const tag = $("up-tag").value;
-  if (!channel) { toast("Primero elige un canal"); return; }
+  const dest = $("up-dest").value;
+  if (!dest) { toast("Primero elige dónde guardarlo"); $("up-dest").focus(); return; }
+  const { channel, tag } = parseDest(dest);
   const when = { when_part: $("up-when-part").value, when_day: $("up-when-day").value, when_month: $("up-when-month").value };
-  [...files].forEach((file) => uploadOne(file, channel, tag, when));
+  [...files].forEach((file) => uploadOne(file, channel, tag, when, destLabel(dest)));
 }
 
 // one upload at a time keeps an old laptop and the home WiFi responsive
 let uploadQueue = Promise.resolve();
 
-function uploadOne(file, channel, tag, when = {}) {
+function uploadOne(file, channel, tag, when = {}, where = "") {
   const bar = el("div");
   const label = el("span", {}, "En espera…");
-  const item = el("li", {}, el("b", {}, file.name), el("br"), label, el("div", { class: "bar" }, bar));
+  const item = el("li", {}, el("b", {}, file.name), el("small", { class: "muted" }, `  → ${where}`), el("br"), label,
+    el("div", { class: "bar" }, bar));
   $("upload-list").prepend(item);
 
   uploadQueue = uploadQueue.then(() => new Promise((resolve) => {
     const form = new FormData();
-    form.append("channel", channel);
-    form.append("tag", tag);
+    if (channel) form.append("channel", channel);
+    form.append("tag", tag || "");
     for (const [k, v] of Object.entries(when)) if (v) form.append(k, v);
     form.append("file", file);
     const xhr = new XMLHttpRequest();
@@ -259,7 +293,7 @@ function uploadOne(file, channel, tag, when = {}) {
       try { detail = JSON.parse(xhr.responseText).detail || ""; } catch (_) { /* ignore */ }
       if (xhr.status === 200) {
         bar.style.width = "100%";
-        label.textContent = "✅ Listo. Aparecerá en la programación en unos minutos.";
+        label.textContent = "✅ Listo. Los canales que lo usan lo pasan en unos minutos.";
       } else {
         item.classList.add("failed");
         label.textContent = `❌ ${detail || "Error " + xhr.status}`;
@@ -288,103 +322,191 @@ function fmtDuration(sec) {
 }
 
 const probed = new Set();
+const selection = new Map();   // key -> {channel, tag, name}
+const openFolders = new Set();
+const selKey = (channel, tag, name) => `${channel || ""}|${tag || ""}|${name}`;
 
 async function renderLibrary() {
-  const root = $("library");
   try {
     await loadChannels();
   } catch (e) {
-    root.replaceChildren(el("p", { class: "error" }, e.message));
+    $("library").replaceChildren(el("p", { class: "error" }, e.message));
     return;
   }
-  const chSel = $("lib-channel");
-  const prev = chSel.value;
-  chSel.replaceChildren(el("option", { value: "" }, "Todos los canales"),
-    ...channelsCache.map((c) => el("option", { value: c.name }, `${c.number} · ${c.long_name}`)));
-  chSel.value = prev;
   drawLibrary();
 }
 
-function drawLibrary() {
-  const root = $("library");
-  const q = $("lib-search").value.trim().toLowerCase();
-  const only = $("lib-channel").value;
-  root.replaceChildren(...channelsCache.filter((c) => !only || c.name === only).map((c) => {
-    const card = el("div", { class: "card" }, el("h2", {}, `${c.number} · ${c.long_name}`));
-    // same size twice in a channel: almost surely the same video uploaded twice
-    const sizes = {};
-    c.folders.forEach((f) => f.videos.forEach((v) => { if (!v.placeholder) sizes[v.size] = (sizes[v.size] || 0) + 1; }));
-    for (const f of c.folders) {
-      const videos = f.videos.filter((v) => !q || v.name.toLowerCase().includes(q));
-      if (q && !videos.length) continue;
-      const total = f.videos.reduce((s, v) => s + (v.duration || 0), 0);
-      const isProgram = f.tag && f.tag.includes("/");
-      const head = el("summary", {}, el("span", {}, `${isProgram ? "↳ " : ""}${f.label}`),
-        el("small", { class: "muted" }, ` ${f.videos.length} videos${total ? " · " + fmtDuration(total) : ""}`));
-      const block = el("details", { class: "lib-folder" + (isProgram ? " program" : "") }, head);
-      if (q) block.open = true;
-      block.addEventListener("toggle", () => { if (block.open) probeFolder(c, f); });
-      if (!videos.length) block.append(el("p", { class: "muted" }, "Todavía no hay videos aquí."));
-      for (const v of videos) {
-        const name = el("span", { class: "name" }, v.file || v.name);
-        if (v.placeholder) name.append(el("span", { class: "badge" }, "de ejemplo"));
-        if (v.when) name.append(el("span", { class: "badge when" }, "🕒 " + v.when));
-        if (!v.placeholder && sizes[v.size] > 1) name.append(el("span", { class: "badge dup" }, "repetido"));
-        const thumb = el("img", { class: "thumb", loading: "lazy", alt: "",
-          src: `/api/library/thumb?channel=${encodeURIComponent(c.name)}&tag=${encodeURIComponent(f.tag ?? "")}&name=${encodeURIComponent(v.name)}` });
-        const meta = el("span", { class: "size" }, [fmtDuration(v.duration), formatSize(v.size)].filter(Boolean).join(" · "));
-        block.append(el("div", { class: "video-row" }, thumb, el("span", { class: "vinfo" }, name, meta),
-          el("button", { class: "btn small ghost", "aria-label": `Mover ${v.name}`, onclick: () => moveVideo(c, f, v) }, "↔"),
-          el("button", { class: "btn danger", "aria-label": `Borrar ${v.name}`, onclick: () => deleteVideo(c, f, v) }, "🗑")));
-      }
-      card.append(block);
-    }
-    return card;
-  }));
-}
-
-async function probeFolder(c, f) {
-  const key = `${c.name}|${f.tag}`;
-  if (probed.has(key) || !f.videos.some((v) => v.duration == null && !v.placeholder)) return;
-  probed.add(key);
-  try {
-    const res = await api("/api/library/probe", { json: { channel: c.name, tag: f.tag } });
-    let changed = false;
-    f.videos.forEach((v) => { if (res.durations[v.name] != null && v.duration == null) { v.duration = res.durations[v.name]; changed = true; } });
-    if (changed) {
-      const open = [...document.querySelectorAll(".lib-folder")].map((d) => d.open);
+function folderBlock(channel, f, q, sizes) {
+  const videos = f.videos.filter((v) => !q || v.name.toLowerCase().includes(q));
+  if (q && !videos.length) return null;
+  const total = f.videos.reduce((s, v) => s + (v.duration || 0), 0);
+  const real = f.videos.filter((v) => !v.placeholder).length;
+  const isProgram = f.tag && f.tag.includes("/");
+  const key = `${channel || ""}|${f.tag}`;
+  const label = isProgram ? `↳ ${f.label.split(" › ").pop()}` : f.label;
+  const head = el("summary", {}, el("span", {}, label),
+    el("small", { class: "muted" }, ` ${real} videos${total ? " · " + fmtDuration(total) : ""}`));
+  const block = el("details", { class: "lib-folder" + (isProgram ? " program" : "") }, head);
+  block.open = !!q || openFolders.has(key);
+  block.addEventListener("toggle", () => {
+    if (block.open) { openFolders.add(key); probeFolder(channel, f); } else openFolders.delete(key);
+  });
+  if (!videos.length) block.append(el("p", { class: "muted" }, "Todavía no hay videos aquí."));
+  if (videos.some((v) => !v.placeholder)) {
+    const all = el("input", { type: "checkbox", "aria-label": "Elegir todos" });
+    all.checked = videos.filter((v) => !v.placeholder).every((v) => selection.has(selKey(channel, f.tag, v.name)));
+    all.addEventListener("change", () => {
+      videos.filter((v) => !v.placeholder).forEach((v) => {
+        const k = selKey(channel, f.tag, v.name);
+        if (all.checked) selection.set(k, { channel, tag: f.tag, name: v.name }); else selection.delete(k);
+      });
       drawLibrary();
-      document.querySelectorAll(".lib-folder").forEach((d, i) => { d.open = open[i]; });
-    }
-  } catch (_) { /* durations are a nice-to-have */ }
+    });
+    block.append(el("label", { class: "switch selall" }, all, " Elegir todos"));
+  }
+  for (const v of videos) {
+    const k = selKey(channel, f.tag, v.name);
+    const name = el("span", { class: "name" }, v.file || v.name);
+    if (v.placeholder) name.append(el("span", { class: "badge" }, "de ejemplo"));
+    if (v.when) name.append(el("span", { class: "badge when" }, "🕒 " + v.when));
+    if (!v.placeholder && sizes[v.size] > 1) name.append(el("span", { class: "badge dup" }, "repetido"));
+    const qs = `channel=${encodeURIComponent(channel || "")}&tag=${encodeURIComponent(f.tag ?? "")}&name=${encodeURIComponent(v.name)}`;
+    const thumb = el("img", { class: "thumb", loading: "lazy", alt: "", src: `/api/library/thumb?${qs}` });
+    const meta = el("span", { class: "size" }, [fmtDuration(v.duration), formatSize(v.size)].filter(Boolean).join(" · "));
+    const box = el("input", { type: "checkbox", "aria-label": `Elegir ${v.name}` });
+    box.checked = selection.has(k);
+    box.disabled = v.placeholder;
+    box.addEventListener("change", () => {
+      if (box.checked) selection.set(k, { channel, tag: f.tag, name: v.name }); else selection.delete(k);
+      updateSelbar();
+    });
+    block.append(el("label", { class: "video-row" + (box.checked ? " picked" : "") }, box, thumb,
+      el("span", { class: "vinfo" }, name, meta)));
+  }
+  return block;
 }
 
-async function moveVideo(channel, folder, video) {
-  const dests = [];
-  channelsCache.forEach((c) => c.folders.forEach((f) => {
-    if (c.name !== channel.name || f.tag !== folder.tag) dests.push({ c, f });
-  }));
-  const list = dests.map((d, i) => `${i + 1}. ${d.c.long_name} › ${d.f.label}`).join("\n");
-  const answer = prompt(`¿A dónde mover "${video.file || video.name}"? Escribe el número:\n\n${list}`);
-  const n = Number(answer);
-  if (!answer || !n || n < 1 || n > dests.length) return;
-  const d = dests[n - 1];
+function drawLibrary() {
+  const q = $("lib-search").value.trim().toLowerCase();
+  const sizes = {};
+  const count = (folders) => folders.forEach((f) => f.videos.forEach((v) => { if (!v.placeholder) sizes[v.size] = (sizes[v.size] || 0) + 1; }));
+  count(libraryCache.folders);
+  const libCard = el("div", { class: "card" });
+  libraryCache.folders.forEach((f) => { const b = folderBlock(null, f, q, sizes); if (b) libCard.append(b); });
+  const cards = [libCard];
+  for (const c of channelsCache) {
+    if (!c.folders.length) continue;
+    const card = el("div", { class: "card" }, el("h2", {}, `📺 ${c.number} · ${c.long_name}`),
+      el("p", { class: "muted small" }, "Lo propio de este canal."));
+    let any = false;
+    c.folders.forEach((f) => { const b = folderBlock(c.name, f, q, {}); if (b) { card.append(b); any = true; } });
+    if (any) cards.push(card);
+  }
+  $("library").replaceChildren(...cards);
+  updateSelbar();
+}
+
+function updateSelbar() {
+  const n = selection.size;
+  $("selbar").hidden = n === 0;
+  $("sel-count").textContent = `${n} elegido${n === 1 ? "" : "s"}`;
+  const sel = $("sel-dest");
+  const prev = sel.value;
+  sel.replaceChildren(el("option", { value: "" }, "Mover a…"), ...destGroups(prev));
+}
+
+async function moveSelected() {
+  const dest = $("sel-dest").value;
+  if (!dest) { toast("Elige a dónde moverlos"); return; }
+  const { channel, tag } = parseDest(dest);
   try {
-    await api("/api/library/move", { json: { channel: channel.name, tag: folder.tag, name: video.name, to_channel: d.c.name, to_tag: d.f.tag } });
-    toast("Video movido");
+    const r = await api("/api/library/move-many", { json: { items: [...selection.values()], to_channel: channel, to_tag: tag } });
+    selection.clear();
+    toast(`${r.moved} videos movidos a ${destLabel(dest)}`);
     renderLibrary();
   } catch (e) { toast(e.message); }
 }
 
-async function deleteVideo(channel, folder, video) {
-  if (!confirm(`¿Borrar "${video.file || video.name}" de ${channel.long_name}?`)) return;
+async function deleteSelected() {
+  const n = selection.size;
+  if (!confirm(`¿Borrar ${n} video${n === 1 ? "" : "s"}? No se puede deshacer.`)) return;
   try {
-    await api("/api/library/delete", { json: { channel: channel.name, tag: folder.tag, name: video.name } });
-    toast("Video borrado");
+    const r = await api("/api/library/delete-many", { json: { items: [...selection.values()] } });
+    selection.clear();
+    toast(`${r.deleted} videos borrados`);
     renderLibrary();
-  } catch (e) {
-    toast(e.message);
-  }
+  } catch (e) { toast(e.message); }
+}
+
+async function probeFolder(channel, f) {
+  const key = `${channel}|${f.tag}`;
+  if (probed.has(key) || !f.videos.some((v) => v.duration == null && !v.placeholder)) return;
+  probed.add(key);
+  try {
+    const res = await api("/api/library/probe", { json: { channel, tag: f.tag } });
+    let changed = false;
+    f.videos.forEach((v) => { if (res.durations[v.name] != null && v.duration == null) { v.duration = res.durations[v.name]; changed = true; } });
+    if (changed) drawLibrary();
+  } catch (_) { /* durations are a nice-to-have */ }
+}
+
+// ---------- categories and programs ----------
+
+let libEdit = [];
+
+function openLibEditor() {
+  libEdit = libraryCache.categories.map((c) => ({ ...c, programs: c.programs.map((p) => ({ ...p })) }));
+  $("lib-msg").textContent = "";
+  $("lib-editor").hidden = false;
+  renderLibEditor();
+  $("lib-editor").scrollIntoView({ behavior: "smooth" });
+}
+
+function nameField(item, label) {
+  const input = el("input", { type: "text", maxlength: "30", value: item.label, "aria-label": label });
+  input.addEventListener("input", () => { item.label = input.value; });
+  return input;
+}
+
+function renderLibEditor() {
+  $("lib-cats").replaceChildren(...libEdit.map((cat, i) => {
+    const li = el("li", { class: "cat-item" },
+      el("div", { class: "cat-row" }, el("span", { class: "swatch" }, "📁"), nameField(cat, "Nombre de la categoría"),
+        el("button", { class: "btn small danger", type: "button", "aria-label": `Quitar ${cat.label}`,
+          onclick: () => { libEdit.splice(i, 1); renderLibEditor(); } }, "✕")));
+    const progs = el("ul", { class: "prog-list" }, ...cat.programs.map((p, j) => el("li", {},
+      el("span", { class: "muted" }, "↳"), nameField(p, "Nombre del programa"),
+      el("button", { class: "btn small danger", type: "button", "aria-label": `Quitar ${p.label}`,
+        onclick: () => { cat.programs.splice(j, 1); renderLibEditor(); } }, "✕"))));
+    const add = el("input", { type: "text", maxlength: "30", placeholder: "＋ Programa (ej: Bluey)" });
+    // Enter and leaving the box both add it: clear first so it is added once
+    const addIt = () => { const v = add.value.trim(); add.value = ""; if (v) { cat.programs.push({ label: v }); renderLibEditor(); } };
+    add.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIt(); } });
+    add.addEventListener("change", addIt);
+    progs.append(el("li", { class: "prog-add" }, el("span", { class: "muted" }, "↳"), add));
+    li.append(progs);
+    return li;
+  }));
+}
+
+function addLibCat() {
+  const label = $("lib-cat-new").value.trim();
+  if (!label) return;
+  libEdit.push({ label, programs: [] });
+  $("lib-cat-new").value = "";
+  renderLibEditor();
+}
+
+async function saveLibEditor() {
+  const named = (x) => (x.tag ? { tag: x.tag, label: x.label } : x.label);
+  const categories = libEdit.map((c) => ({ ...(c.tag ? { tag: c.tag } : {}), label: c.label, programs: c.programs.map(named) }));
+  $("lib-msg").textContent = "";
+  try {
+    await api("/api/library", { method: "PUT", json: { categories } });
+    toast("Biblioteca guardada");
+    $("lib-editor").hidden = true;
+    renderLibrary();
+  } catch (e) { $("lib-msg").textContent = e.message; }
 }
 
 // ---------- settings ----------
@@ -435,10 +557,17 @@ function wireUp() {
   buildKeypad();
   document.querySelectorAll("[data-remote]").forEach((b) => b.addEventListener("click", () => sendRemote(b.dataset.remote)));
   document.querySelectorAll(".tabbar button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
-  $("up-channel").addEventListener("change", fillTags);
+  $("up-dest").addEventListener("change", updateDropLabel);
+  $("lib-organize").addEventListener("click", openLibEditor);
+  $("lib-cancel").addEventListener("click", () => { $("lib-editor").hidden = true; });
+  $("lib-save").addEventListener("click", saveLibEditor);
+  $("lib-cat-add").addEventListener("click", addLibCat);
+  $("lib-cat-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addLibCat(); } });
+  $("sel-move").addEventListener("click", moveSelected);
+  $("sel-delete").addEventListener("click", deleteSelected);
+  $("sel-clear").addEventListener("click", () => { selection.clear(); drawLibrary(); });
   ["up-when-part", "up-when-day", "up-when-month"].forEach((id) => $(id).addEventListener("change", whenSummary));
   $("lib-search").addEventListener("input", drawLibrary);
-  $("lib-channel").addEventListener("change", drawLibrary);
   const tvKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", ""];
   $("tv-keypad").replaceChildren(...tvKeys.map((k) => el("button", {
     class: "key", type: "button", onclick: () => k && sendDigit(k === "⌫" ? "clear" : k),

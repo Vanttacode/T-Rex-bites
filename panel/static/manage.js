@@ -96,13 +96,18 @@ function openScheduleTab() {
 
 // ---------- channels ----------
 
-const editor = { channel: null, cats: [], pautas: [] };
+const editor = { channel: null, pautas: [] };
+
+function contentLabel(tag) {
+  return (libraryCache.content.find((c) => c.tag === tag) || { label: tag }).label;
+}
 
 function typeLabel(c) {
-  if (c.type === "loop") return "🔁 Todo el día";
-  const progs = c.categories.reduce((n, cat) => n + (cat.programs || []).length, 0);
-  const base = c.kind === "music" ? "🎵 Música" : "🗓 Con horario";
-  return `${base} · ${c.categories.length} categorías${progs ? ` · ${progs} programas` : ""}${c.parental ? " · 🔒" : ""}`;
+  if (c.kind === "allday") {
+    const what = (c.allday && c.allday.tags.length) ? c.allday.tags.map(contentLabel).join(" + ") : "nada";
+    return `🔁 Todo el día · ${what}${c.parental ? " · 🔒" : ""}`;
+  }
+  return `🗓 Con horario${c.ads && c.ads.enabled ? " · 📺 comerciales" : ""}${c.parental ? " · 🔒" : ""}`;
 }
 
 async function openMoreTab() {
@@ -124,21 +129,21 @@ function nextFreeNumber() {
   return 99;
 }
 
+function editorKind() {
+  return editor.channel ? editor.channel.kind : document.querySelector('input[name="ch-type"]:checked').value;
+}
+
 function openEditor(channel) {
   editor.channel = channel;
-  editor.cats = channel
-    ? channel.categories.map((c) => ({ ...c, programs: (c.programs || []).map((p) => ({ ...p })) }))
-    : [{ label: "Dibujos animados", programs: [] }];
   editor.pautas = channel ? (channel.pautas || []).map((x) => ({ ...x })) : [];
   $("ch-editor-title").textContent = channel ? `Editar: ${channel.long_name}` : "Nuevo canal";
   $("ch-name").value = channel ? channel.long_name : "";
   $("ch-number").value = channel ? channel.number : nextFreeNumber();
   $("ch-type-field").hidden = !!channel;
-  document.querySelector('input[name="ch-type"][value="standard"]').checked = true;
+  document.querySelector('input[name="ch-type"][value="allday"]').checked = true;
   $("ch-delete").hidden = !channel;
   $("ch-msg").textContent = "";
-  // commercials and logo are set once the channel exists
-  const scheduled = channel && channel.type === "standard";
+  const scheduled = channel && channel.kind === "schedule";
   $("ch-ads-field").hidden = !scheduled;
   $("ch-logo-field").hidden = !channel;
   $("ch-new-note").hidden = !!channel;
@@ -162,51 +167,38 @@ function openEditor(channel) {
     $("ch-logo-reset").hidden = !logo.custom;
     refreshLogoPreview(channel.name);
   }
-  renderCats();
+  const current = channel && channel.allday ? channel.allday : { tags: [], mode: "random" };
+  document.querySelector(`input[name="ch-mode"][value="${current.mode}"]`).checked = true;
+  renderContent(current.tags);
+  renderPautas();
   $("ch-editor").hidden = false;
   $("ch-editor").scrollIntoView({ behavior: "smooth" });
 }
 
-function editorType() {
-  return editor.channel ? editor.channel.type : document.querySelector('input[name="ch-type"]:checked').value;
+function renderContent(selected) {
+  const k = editorKind();
+  // an existing schedule channel picks its content block by block in the editor
+  $("ch-content-field").hidden = !!editor.channel && k === "schedule";
+  $("ch-mode-field").hidden = k !== "allday";
+  $("ch-content-title").textContent = k === "allday" ? "¿Qué pasa este canal todo el día?"
+    : "¿Con qué empieza? (después lo armas en el editor de programación)";
+  $("ch-content").replaceChildren(...libraryCache.content.map((c) => {
+    const box = el("input", { type: "checkbox", value: c.tag });
+    box.checked = selected.includes(c.tag);
+    const program = c.tag.includes("/");
+    return el("label", { class: "switch" + (program ? " program" : "") }, box,
+      program ? ` ↳ ${c.label.split(" › ").pop()}` : ` ${c.label}`);
+  }));
+}
+
+function pickedContent() {
+  return [...$("ch-content").querySelectorAll("input:checked")].map((i) => i.value);
 }
 
 function nameInput(item, label) {
   const input = el("input", { type: "text", maxlength: "30", value: item.label, "aria-label": label });
   input.addEventListener("input", () => { item.label = input.value; });
   return input;
-}
-
-function renderCats() {
-  const type = editorType();
-  $("ch-cats-field").hidden = type === "loop";
-  if (!editor.channel && type === "music" && editor.cats.length === 1 && editor.cats[0].label === "Dibujos animados") {
-    editor.cats = [{ label: "Videos musicales", programs: [] }];
-  } else if (!editor.channel && type === "standard" && editor.cats.length === 1 && editor.cats[0].label === "Videos musicales") {
-    editor.cats = [{ label: "Dibujos animados", programs: [] }];
-  }
-  $("ch-cats").replaceChildren(...editor.cats.map((cat, i) => {
-    const swatch = el("span", { class: "swatch" });
-    swatch.style.background = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
-    const li = el("li", { class: "cat-item" },
-      el("div", { class: "cat-row" }, swatch, nameInput(cat, "Nombre de la categoría"),
-        el("button", { class: "btn small danger", type: "button", "aria-label": `Quitar ${cat.label}`,
-          onclick: () => { editor.cats.splice(i, 1); renderCats(); } }, "✕")));
-    if (editor.channel) {
-      const progs = el("ul", { class: "prog-list" }, ...cat.programs.map((p, j) => el("li", {},
-        el("span", { class: "muted" }, "↳"), nameInput(p, "Nombre del programa"),
-        el("button", { class: "btn small danger", type: "button", "aria-label": `Quitar ${p.label}`,
-          onclick: () => { cat.programs.splice(j, 1); renderCats(); } }, "✕"))));
-      const add = el("input", { type: "text", maxlength: "30", placeholder: "＋ Programa (ej: Bluey)" });
-      const addIt = () => { const v = add.value.trim(); if (v) { cat.programs.push({ label: v }); renderCats(); } };
-      add.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addIt(); } });
-      add.addEventListener("change", addIt);
-      progs.append(el("li", { class: "prog-add" }, el("span", { class: "muted" }, "↳"), add));
-      li.append(progs);
-    }
-    return li;
-  }));
-  renderPautas();
 }
 
 function renderPautas() {
@@ -224,26 +216,18 @@ function addPauta() {
   renderPautas();
 }
 
-function addCat() {
-  const label = $("ch-cat-new").value.trim();
-  if (!label) return;
-  editor.cats.push({ label, programs: [] });
-  $("ch-cat-new").value = "";
-  renderCats();
-}
-
 async function saveChannel() {
   const named = (x) => (x.tag ? { tag: x.tag, label: x.label } : x.label);
-  const categories = editor.cats.map((c) => ({
-    ...(c.tag ? { tag: c.tag } : {}), label: c.label, programs: (c.programs || []).map(named),
-  }));
   const body = { long_name: $("ch-name").value, number: Number($("ch-number").value) };
+  const mode = document.querySelector('input[name="ch-mode"]:checked').value;
+  const tags = pickedContent();
   $("ch-msg").textContent = "";
   try {
     if (editor.channel) {
       body.parental = $("ch-parental").checked;
-      if (editor.channel.type === "standard") {
-        body.categories = categories;
+      if (editor.channel.kind === "allday") {
+        body.allday = { tags, mode };
+      } else {
         body.pautas = editor.pautas.map(named);
         body.ads = {
           enabled: $("ch-ads-on").checked,
@@ -255,8 +239,7 @@ async function saveChannel() {
       await api(`/api/channels/${encodeURIComponent(editor.channel.name)}`, { method: "PUT", json: body });
       toast("Canal guardado");
     } else {
-      body.type = editorType();
-      if (body.type !== "loop") body.categories = editor.cats.map((c) => c.label);
+      Object.assign(body, { kind: editorKind(), tags, mode });
       await api("/api/channels", { json: body });
       toast("Canal creado. La tele se reinicia en unos segundos.");
     }
@@ -346,11 +329,9 @@ function wireManagement() {
   $("ch-cancel").addEventListener("click", () => { $("ch-editor").hidden = true; });
   $("ch-save").addEventListener("click", saveChannel);
   $("ch-delete").addEventListener("click", deleteChannel);
-  $("ch-cat-add").addEventListener("click", addCat);
   $("ch-pauta-add").addEventListener("click", addPauta);
   $("ch-pauta-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addPauta(); } });
-  $("ch-cat-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addCat(); } });
-  document.querySelectorAll('input[name="ch-type"]').forEach((r) => r.addEventListener("change", renderCats));
+  document.querySelectorAll('input[name="ch-type"]').forEach((r) => r.addEventListener("change", () => renderContent(pickedContent())));
   $("ch-ads-on").addEventListener("change", (e) => { $("ch-ads-opts").hidden = !e.target.checked; });
   $("ch-logo-file").addEventListener("change", (e) => { uploadLogo(e.target.files[0]); e.target.value = ""; });
   $("ch-logo-reset").addEventListener("click", resetLogo);

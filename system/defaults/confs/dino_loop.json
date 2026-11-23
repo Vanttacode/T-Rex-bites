@@ -3,7 +3,701 @@
     "network_name": "DinoLoop",
     "network_long_name": "Dino Loop",
     "channel_number": 5,
-    "network_type": "loop",
-    "content_dir": "catalog/dino_loop"
+    "network_type": "standard",
+    "content_dir": "catalog/biblioteca",
+    "monday": {
+      "0": {
+        "tags": "dibujos"
+      },
+      "1": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "2": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "3": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "4": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "5": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "6": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "7": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "8": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "9": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "10": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "11": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "12": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "13": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "14": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "15": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "16": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "17": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "18": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "19": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "20": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "21": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "22": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "23": {
+        "tags": "dibujos",
+        "continued": true
+      }
+    },
+    "tuesday": {
+      "0": {
+        "tags": "dibujos"
+      },
+      "1": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "2": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "3": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "4": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "5": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "6": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "7": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "8": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "9": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "10": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "11": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "12": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "13": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "14": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "15": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "16": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "17": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "18": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "19": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "20": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "21": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "22": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "23": {
+        "tags": "dibujos",
+        "continued": true
+      }
+    },
+    "wednesday": {
+      "0": {
+        "tags": "dibujos"
+      },
+      "1": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "2": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "3": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "4": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "5": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "6": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "7": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "8": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "9": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "10": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "11": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "12": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "13": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "14": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "15": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "16": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "17": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "18": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "19": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "20": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "21": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "22": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "23": {
+        "tags": "dibujos",
+        "continued": true
+      }
+    },
+    "thursday": {
+      "0": {
+        "tags": "dibujos"
+      },
+      "1": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "2": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "3": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "4": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "5": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "6": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "7": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "8": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "9": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "10": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "11": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "12": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "13": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "14": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "15": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "16": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "17": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "18": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "19": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "20": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "21": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "22": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "23": {
+        "tags": "dibujos",
+        "continued": true
+      }
+    },
+    "friday": {
+      "0": {
+        "tags": "dibujos"
+      },
+      "1": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "2": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "3": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "4": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "5": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "6": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "7": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "8": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "9": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "10": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "11": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "12": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "13": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "14": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "15": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "16": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "17": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "18": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "19": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "20": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "21": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "22": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "23": {
+        "tags": "dibujos",
+        "continued": true
+      }
+    },
+    "saturday": {
+      "0": {
+        "tags": "dibujos"
+      },
+      "1": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "2": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "3": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "4": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "5": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "6": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "7": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "8": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "9": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "10": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "11": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "12": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "13": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "14": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "15": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "16": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "17": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "18": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "19": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "20": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "21": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "22": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "23": {
+        "tags": "dibujos",
+        "continued": true
+      }
+    },
+    "sunday": {
+      "0": {
+        "tags": "dibujos"
+      },
+      "1": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "2": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "3": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "4": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "5": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "6": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "7": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "8": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "9": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "10": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "11": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "12": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "13": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "14": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "15": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "16": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "17": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "18": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "19": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "20": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "21": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "22": {
+        "tags": "dibujos",
+        "continued": true
+      },
+      "23": {
+        "tags": "dibujos",
+        "continued": true
+      }
+    },
+    "schedule_increment": 0,
+    "commercial_free": true,
+    "fallback_tag": "dibujos",
+    "break_strategy": "end",
+    "break_duration": 120,
+    "sign_off_video": "runtime/signoff.mp4",
+    "off_air_video": "runtime/off_air_pattern.mp4",
+    "standby_image": "runtime/standby.png",
+    "be_right_back_media": "runtime/brb.png",
+    "bump_dir": "canales/dinoloop/bumps",
+    "trexbites": {
+      "kind": "allday",
+      "folder": "canales/dinoloop",
+      "pautas": []
+    }
   }
 }

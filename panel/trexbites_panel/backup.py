@@ -9,7 +9,7 @@ import time
 import zipfile
 from pathlib import Path
 
-from . import channels
+from . import channels, library
 
 FORMAT = "trexbites-backup"
 VERSION = 1
@@ -38,6 +38,8 @@ def build(confs_dir, fs42_dir, state, version, osd_path=None):
                 logo = channels.logo_file(conf, fs42_dir)
                 if logo:
                     zf.write(logo, f"logos/{name}/{logo.name}")
+        zf.writestr("biblioteca.json", json.dumps({"categories": library.load(fs42_dir)}, indent=2,
+                                                  ensure_ascii=False))
         settings = {k: state.get(k) for k in SETTINGS_KEYS if state.get(k) is not None}
         zf.writestr("settings.json", json.dumps(settings, indent=2, ensure_ascii=False))
         if osd_path and Path(osd_path).is_file():
@@ -87,10 +89,16 @@ def read(data):
         json.loads(osd)
     except (KeyError, ValueError):
         osd = None
+    try:
+        lib = json.loads(zf.read("biblioteca.json")).get("categories") or []
+        lib = [c for c in library.clean_tree(lib, lib)] if isinstance(lib, list) else []
+    except (KeyError, ValueError, AttributeError, library.LibraryError):
+        lib = []
     numbers = [s.get("channel_number") for s in stations]
     if len(numbers) != len(set(numbers)):
         raise BackupError("El respaldo tiene dos canales con el mismo número.")
-    return {"manifest": manifest, "stations": stations, "logos": logos, "settings": settings, "osd": osd}
+    return {"manifest": manifest, "stations": stations, "logos": logos, "settings": settings, "osd": osd,
+            "library": lib}
 
 
 def _check_station(conf):

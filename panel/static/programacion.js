@@ -71,9 +71,9 @@ function toast(msg) {
 
 const hh = (h) => `${String(h).padStart(2, "0")}:00`;
 const clone = (x) => JSON.parse(JSON.stringify(x));
-const categories = () => (st.channel ? st.channel.categories : []);
-// categories and "category/program" tags, in order
-const contentList = () => (st.channel ? st.channel.content || categories() : []);
+// the shared library: categories and "category/program" tags, in order
+const categories = () => (st.library ? st.library.categories : []);
+const contentList = () => (st.library ? st.library.content : []);
 const labelOf = (tag) => (contentList().find((c) => c.tag === tag) || { label: tag }).label;
 const shortLabel = (tag) => (tag.includes("/") ? labelOf(tag).split(" › ").pop() : labelOf(tag));
 const colorOf = (tag) => {
@@ -614,7 +614,7 @@ function wireDialogs() {
     if (isDirty()) { $("dup-error").textContent = "Primero guarda los cambios de este canal."; return; }
     try {
       const res = await api(`/api/channels/${encodeURIComponent(st.channel.name)}/duplicate`, {
-        json: { long_name: $("dup-name").value, number: Number($("dup-number").value), share_videos: $("dup-share").checked },
+        json: { long_name: $("dup-name").value, number: Number($("dup-number").value) },
       });
       $("dlg-dup").close();
       toast("Canal creado. La tele se reinicia en unos segundos.");
@@ -654,12 +654,13 @@ function nextDay(day) {
 async function loadChannels(selectName) {
   const data = await api("/api/channels");
   st.channels = data.channels;
-  const scheduled = st.channels.filter((c) => c.type === "standard");
+  st.library = data.library;
+  const scheduled = st.channels.filter((c) => c.kind === "schedule");
   const sel = $("channel");
   sel.replaceChildren(...scheduled.map((c) => el("option", { value: c.name }, `${c.number} · ${c.long_name}`)));
   if (!scheduled.length) {
     $("layout").hidden = true;
-    toast("No hay canales con horario. Crea uno en el panel: Más → Canales.");
+    toast("No hay canales con horario. Crea uno en el panel: Más → Canales → Nuevo → Con horario.");
     return;
   }
   const name = selectName && scheduled.some((c) => c.name === selectName) ? selectName

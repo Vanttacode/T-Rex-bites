@@ -32,7 +32,7 @@
   <div class="layout" id="layout" hidden>
     <aside class="palette">
       <h2>Contenido</h2>
-      <p class="hint">Elige un contenido y <b>arrastra sobre la línea de tiempo</b> para crear un bloque.</p>
+      <p class="hint">Elige una categoría o programa de la <b>biblioteca</b> y <b>arrastra sobre la línea de tiempo</b> para crear un bloque.</p>
       <div id="palette"></div>
       <h2>Comerciales del canal</h2>
       <p class="hint" id="ads-info"></p>
@@ -200,7 +200,7 @@
       <p class="hint">Crea un canal nuevo con las mismas categorías, programación, comerciales y logo que <b id="dup-src"></b>.</p>
       <label>Nombre del canal nuevo <input type="text" id="dup-name" maxlength="30"></label>
       <label>Número <input type="number" id="dup-number" min="1" max="99"></label>
-      <label class="radio"><input type="checkbox" id="dup-share" checked> Usar los mismos videos <small>(si no, el canal nuevo empieza con carpetas vacías)</small></label>
+      <p class="hint small">Pasa los mismos videos de la biblioteca y copia sus comerciales, cortinillas y videos fijos.</p>
       <p class="error" id="dup-error"></p>
       <menu><button value="cancel">Cancelar</button><button id="dup-go" class="primary" value="ok">Crear canal</button></menu>
     </form>

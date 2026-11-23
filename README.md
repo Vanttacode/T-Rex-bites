@@ -106,17 +106,25 @@ Para tenerlo como app en el teléfono, en el navegador usa
 | 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y acceso al editor de programación |
 | ☰ **Más** | **WiFi**, **canales** (categorías y programas, **comerciales**, pautas, **logo**, PIN), **opciones de la tele**, **canal guía**, **respaldo**, **actualizaciones**, **qué se vio**, PIN y opciones avanzadas |
 
-**Novedades de la versión 0.5:**
+**Cómo se organiza (versión 0.6):**
 
-- 📂 **Programas dentro de categorías**: "Dibujos animados → Bluey". Un bloque puede pasar toda la categoría al azar o un programa específico, en orden.
-- 📺 **Pautas comerciales**: tandas propias por bloque (ej: "Juguetes" en la tarde) y comerciales que salen solo en un **momento** (mañana, noche, un día o un mes, ej: diciembre).
-- 📌 **Videos fijos** al empezar o terminar un bloque, y 🎬 **cortinillas** propias entre programas.
-- 📡 **Estática** al cambiar de canal, 🗒 **canal guía** estilo cable y 🎵 **canal de música**.
-- 🔒 **Canales con PIN**: la tele pide un PIN (se escribe desde el control del teléfono).
-- ⚙️ **Conversión automática** de videos pesados y 🔊 **volumen parejo** en todos.
-- 💾 **Importar desde pendrive** conectado a la tele, 📚 biblioteca con miniaturas, duración, búsqueda, repetidos y mover videos.
-- 💾 **Respaldo** de toda la configuración (descargar y restaurar).
-- 📱 **Ver un canal en otro aparato** (teléfono, tablet, otra tele) en `http://trexbites.local/ver`, sincronizado con la programación.
+- 📚 **Una biblioteca para toda la tele**, con categorías y programas, por ejemplo *Videos musicales → Oliver Tree* o *Dibujos animados → Bluey*. Subes un video una sola vez y lo usa cualquier canal.
+- 📺 **Dos tipos de canal**, que eligen qué pasar de la biblioteca:
+  - **🔁 Todo el día:** una o varias categorías o programas, al azar o en orden.
+  - **🗓 Con horario:** bloques por hora en el editor de programación.
+- Cada canal tiene **lo suyo**: logo, comerciales y pautas, cortinillas, videos fijos y PIN.
+- En **Programas** eliges varios videos con casillas y los **mueves o borras juntos**.
+- Al actualizar desde una versión anterior, tus videos se **mudan solos** a la biblioteca: se mueven en el mismo disco, sin copiar ni borrar nada.
+
+**Otras funciones (desde la 0.5):**
+
+- 📺 **Pautas comerciales** por bloque, y comerciales que salen solo en un **momento**: mañana, noche, un día o un mes.
+- 📌 **Videos fijos** al empezar o terminar un bloque, y 🎬 **cortinillas** propias.
+- 📡 **Estática** al cambiar de canal, y 🗒 **canal guía** estilo cable.
+- 🔒 **Canales con PIN**.
+- ⚙️ **Conversión automática** de videos pesados y 🔊 **volumen parejo**.
+- 💾 **Importar desde pendrive** y **respaldo** de la configuración.
+- 📱 **Ver un canal en otro aparato** en `http://trexbites.local/ver`.
 
 ### Editor de programación (en el computador)
 
@@ -158,7 +166,7 @@ USB T-Rex Bites
          ├─ Arranca directo en la tele (usuario "tv", sin login)
          ├─ FieldStation42 + mpv  → la imagen en pantalla      (/opt/trexbites/fieldstation42)
          ├─ Panel web T-Rex Bites → http://trexbites.local    (/opt/trexbites/panel)
-         └─ Videos en el disco local                          (/srv/trexbites/catalog)
+         └─ Biblioteca de videos en el disco local            (/srv/trexbites/catalog/biblioteca)
 ```
 
 | Carpeta | Qué hay |
@@ -173,8 +181,8 @@ USB T-Rex Bites
 
 | Canal | Tipo | Qué pasa |
 |---|---|---|
-| **3 · T-Rex TV** | Con horario | 7–10 h *Mañana*, 10–13 h *Dibujos*, 13–15 h *Educativos*, 15–18 h *Dibujos*, 18 h *Películas*, 20 h fin de transmisión |
-| **5 · Dino Loop** | Repetición continua | Todos sus videos en loop, a cualquier hora |
+| **3 · T-Rex TV** | 🗓 Con horario | 7–10 h *Mañana*, 10–13 h *Dibujos*, 13–15 h *Educativos*, 15–18 h *Películas* y *Dibujos*, 18 h *Películas*, 20 h fin de transmisión |
+| **5 · Dino Loop** | 🔁 Todo el día | *Dibujos animados* al azar, a cualquier hora |
 
 Los horarios y canales se pueden cambiar en la consola avanzada de
 FieldStation42 (`http://trexbites.local:4242`, enlazada desde Ajustes).
@@ -202,4 +210,4 @@ TREXBITES_FS42_DIR=/tmp/fs42 TREXBITES_STATE=/tmp/fs42/panel.json uvicorn trexbi
 
 ## Estado
 
-Versión 0.5 (beta). Ver [docs/ROADMAP.md](docs/ROADMAP.md) para lo que falta.
+Versión 0.6 (beta). Ver [docs/ROADMAP.md](docs/ROADMAP.md) para lo que falta.

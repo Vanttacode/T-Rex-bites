@@ -265,3 +265,20 @@ fieldset.field legend { padding: 0; margin-bottom: 6px; }
 .chbtn.active { outline: 3px solid var(--accent); }
 #tv-keypad { margin-top: 8px; }
 .wide { display: block; width: 100%; margin-top: 12px; }
+
+/* v0.6: shared library */
+.selbar {
+  position: fixed; left: 8px; right: 8px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 20;
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px;
+  background: #2b2f5e; border: 2px solid var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+}
+.selbar span { font-weight: bold; white-space: nowrap; }
+.selbar select { flex: 1; min-width: 0; padding: 8px; border-radius: 8px; border: 0; background: #15183a; color: var(--text); font: inherit; }
+.video-row { cursor: pointer; }
+.video-row input[type=checkbox] { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+.video-row.picked { background: rgba(255, 138, 31, 0.08); }
+.selall { margin: 4px 0 8px; font-size: 0.9rem; }
+.switch.program { padding-left: 22px; }
+#ch-content { display: grid; gap: 6px; margin: 8px 0; }
+.dropzone.disabled { opacity: 0.6; border-color: var(--muted); }
+#library { padding-bottom: 80px; }

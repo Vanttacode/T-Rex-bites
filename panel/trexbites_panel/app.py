@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from urllib.parse import quote
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import backup, bedtime, channels, media, updates, usb, watch
+from . import backup, bedtime, channels, library, media, migrate, updates, usb, watch
 from .fs42 import FS42Client, FS42Error
 from .history import History
 from .state import PanelState
@@ -155,19 +155,15 @@ def from_thread(fn, *args):
         loop.call_soon_threadsafe(fn, *args)
 
 
-def _channel_of_path(path):
-    for channel in all_channels():
-        for folder in channel["folders"]:
-            folder_path = Path(folder["path"])
-            if folder_path == path.parent or folder_path in path.parents:
-                return channel["name"]
-    return None
-
-
 def _converted(path):
-    name = _channel_of_path(Path(path))
-    if name:
-        from_thread(app.state.fs42.schedule_rebuild, name)
+    """A video was converted (maybe renamed to .mp4): channels must rescan."""
+    from_thread(rebuild_all, app.state.fs42)
+
+
+def rebuild_all(client, restart=False):
+    for conf in channels.load_stations(FS42_DIR / "confs"):
+        if channels.is_channel(conf):
+            client.schedule_rebuild(conf["network_name"], restart=restart)
 
 
 app = FastAPI(title="T-Rex Bites", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
@@ -223,16 +219,38 @@ def all_channels():
     return channels.channel_summaries(FS42_DIR / "confs", FS42_DIR)
 
 
+def library_tree():
+    return library.load(FS42_DIR)
+
+
+def library_tags():
+    return [tag for tag, _ in library.content_tags(library_tree())]
+
+
 def find_folder(channel_name, tag):
-    """The folder for a channel and tag, only if the channel config defines it."""
+    """(channel summary or None, folder). Without a channel, tag is a library
+    category or program; with one, it is one of that channel's own folders."""
     tag = tag or None
+    if not channel_name:
+        if tag and tag in library_tags():
+            return None, library.folder(FS42_DIR, tag)
+        raise HTTPException(status_code=404, detail="Esa categoría o programa no existe.")
     for channel in all_channels():
         if channel["name"] != channel_name:
             continue
         for folder in channel["folders"]:
             if folder["tag"] == tag:
                 return channel, Path(folder["path"])
-    raise HTTPException(status_code=404, detail="Ese canal o categoría no existe.")
+    raise HTTPException(status_code=404, detail="Ese canal o carpeta no existe.")
+
+
+def rebuild_for(client, channel, tag):
+    """Rescan what a change in this folder affects."""
+    if channel:
+        client.schedule_rebuild(channel["name"])
+    else:
+        for name in channels.channels_using(FS42_DIR / "confs", tag):
+            client.schedule_rebuild(name)
 
 
 _UNSAFE_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
@@ -342,11 +360,18 @@ SAMPLE_NAMES = {PLACEHOLDER_NAME, IDENT_NAME}
 
 
 def ensure_folders(conf):
+    """A channel's own folders, with the sample clips FieldStation42 needs."""
     for tag, folder in channels.station_folders(conf, FS42_DIR):
         fill_if_empty(folder, tag)
     bumps = channels.bump_folder(conf, FS42_DIR)
     if bumps:
         fill_if_empty(bumps, channels.BUMPS_TAG)
+    channels.logo_folder(conf, FS42_DIR).mkdir(parents=True, exist_ok=True)
+
+
+def ensure_library():
+    for tag in library_tags():
+        fill_if_empty(library.folder(FS42_DIR, tag), tag)
 
 
 def media_roots():
@@ -477,21 +502,25 @@ async def status(request: Request):
 
 @app.get("/api/channels", dependencies=[Depends(require_session)])
 async def get_channels(request: Request):
+    info = request.app.state.media
     result = []
     for channel in all_channels():
-        folders = []
-        for folder in channel["folders"]:
-            folders.append({
-                "tag": folder["tag"],
-                "label": folder["label"],
-                "videos": list_videos(Path(folder["path"]), request.app.state.media),
-            })
-        result.append({**{k: channel[k] for k in ("name", "long_name", "number", "type", "kind",
-                                                  "categories", "content", "pautas", "blocks", "ads",
-                                                  "logo", "parental")},
-                       "folders": folders})
-    return {"channels": result, "when": {"parts": channels.WHEN_PARTS, "days": channels.WHEN_DAYS,
-                                         "months": channels.WHEN_MONTHS},
+        folders = [{"tag": f["tag"], "label": f["label"], "videos": list_videos(Path(f["path"]), info)}
+                   for f in channel["folders"]]
+        result.append({**{k: v for k, v in channel.items() if k != "folders"}, "folders": folders})
+    tree = library_tree()
+    lib_folders = [{"tag": tag, "label": label,
+                    "videos": list_videos(library.folder(FS42_DIR, tag), info)}
+                   for tag, label in library.content_tags(tree)]
+    rebuilds = request.app.state.fs42.rebuilds
+    problems = {name: r["detail"][-300:] for name, r in rebuilds.items()
+                if r.get("status") == "error" and not name.startswith("_")}
+    return {"channels": result,
+            "library": {"categories": tree,
+                        "content": [{"tag": t, "label": l} for t, l in library.content_tags(tree)],
+                        "folders": lib_folders},
+            "problems": problems,
+            "when": {"parts": channels.WHEN_PARTS, "days": channels.WHEN_DAYS, "months": channels.WHEN_MONTHS},
             "converting": request.app.state.converter.status()}
 
 
@@ -504,14 +533,14 @@ async def disk():
 @app.post("/api/upload", dependencies=[Depends(require_session)])
 async def upload(
     request: Request,
-    channel: str = Form(...),
+    channel: str = Form(""),
     tag: str = Form(""),
     when_part: str = Form(""),
     when_day: str = Form(""),
     when_month: str = Form(""),
     file: UploadFile = File(...),
 ):
-    ch, folder = find_folder(channel, tag)
+    ch, folder = find_folder(channel or None, tag)
     name = safe_filename(file.filename)
     base_folder = folder
     folder = folder / when_subfolder(when_part, when_day, when_month)
@@ -537,7 +566,7 @@ async def upload(
     if target.name != PLACEHOLDER_NAME:
         after_new_video(base_folder)
     queue_conversion(request.app, target)
-    fs42_client(request).schedule_rebuild(ch["name"])
+    rebuild_for(fs42_client(request), ch, tag)
     return {"ok": True, "name": target.name}
 
 
@@ -568,7 +597,7 @@ def queue_conversion(app_, path):
 
 
 class DeleteBody(BaseModel):
-    channel: str
+    channel: str | None = None
     tag: str | None = None
     name: str
 
@@ -579,7 +608,7 @@ async def delete_video(body: DeleteBody, request: Request):
     path = listed_video(folder, body.name)
     path.unlink()
     fill_if_empty(folder, body.tag or None)
-    fs42_client(request).schedule_rebuild(ch["name"])
+    rebuild_for(fs42_client(request), ch, body.tag)
     return {"ok": True}
 
 
@@ -596,15 +625,15 @@ def listed_video(folder, name, extensions=None):
 class NewChannelBody(BaseModel):
     long_name: str
     number: int
-    type: str = "standard"
-    categories: list[str] = []
+    # "schedule": blocks by hour (timeline editor); "allday": the same content all day
+    kind: str = "schedule"
+    tags: list[str] = []
+    mode: str = "random"
 
 
 class EditChannelBody(BaseModel):
     long_name: str
     number: int
-    # existing categories as {"tag", "label"}, new ones as plain labels
-    categories: list[str | dict] | None = None
     # {"enabled": bool, "strategy": "end"|"standard"|"center", "duration": seconds}
     ads: dict | None = None
     # {"show": bool, "permanent": bool}
@@ -613,6 +642,8 @@ class EditChannelBody(BaseModel):
     pautas: list[str | dict[str, str]] | None = None
     # ask for the channel PIN on the TV before showing this channel
     parental: bool | None = None
+    # all-day channels: {"tags": [...], "mode": "random"|"order"}
+    allday: dict | None = None
 
 
 class ScheduleBody(BaseModel):
@@ -623,7 +654,6 @@ class ScheduleBody(BaseModel):
 class DuplicateBody(BaseModel):
     long_name: str
     number: int
-    share_videos: bool = True
 
 
 def _confs_dir():
@@ -644,12 +674,14 @@ async def _save_on_tv(coro):
 @app.post("/api/channels", dependencies=[Depends(require_session)])
 async def create_channel(body: NewChannelBody, request: Request):
     try:
-        conf = channels.new_station_conf(channels.load_stations(_confs_dir()), body.long_name,
-                                         body.number, body.type, body.categories)
+        conf = channels.new_station_conf(channels.load_stations(_confs_dir()), body.long_name, body.number,
+                                         body.kind, body.tags, library_tags(), body.mode, FS42_DIR)
     except channels.ChannelError as e:
         raise _channel_error(e)
-    await _save_on_tv(fs42_client(request).create_station(conf))
+    # folders first: FieldStation42 skips a channel whose folders don't exist yet
     ensure_folders(conf)
+    ensure_library()
+    await _save_on_tv(fs42_client(request).create_station(conf))
     fs42_client(request).schedule_rebuild(conf["network_name"], restart=True)
     return {"ok": True, "name": conf["network_name"]}
 
@@ -659,12 +691,12 @@ async def edit_channel(name: str, body: EditChannelBody, request: Request):
     try:
         old = channels.find_station(_confs_dir(), name)
         conf = channels.update_station_conf(old, channels.load_stations(_confs_dir()), body.long_name,
-                                            body.number, body.categories, body.ads, body.logo,
-                                            body.pautas, body.parental)
+                                            body.number, body.ads, body.logo, body.pautas, body.parental,
+                                            body.allday, library_tags())
     except channels.ChannelError as e:
         raise _channel_error(e)
-    await _save_on_tv(fs42_client(request).update_station(name, conf))
     ensure_folders(conf)
+    await _save_on_tv(fs42_client(request).update_station(name, conf))
     # the player and the on-screen logo only read channel settings when they start
     watched = ("channel_number", "network_long_name", "commercial_free", "break_strategy",
                "break_duration", "show_logo", "logo_permanent", "parental_controls")
@@ -679,7 +711,7 @@ async def delete_channel(name: str, request: Request):
         channels.find_station(_confs_dir(), name)
     except channels.ChannelError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    # the channel's videos stay on disk; a new channel with the same name finds them again
+    # the library videos stay; so do the channel's own folders (commercials, logo)
     await _save_on_tv(fs42_client(request).delete_station(name))
     fs42_client(request).schedule_restart()
     return {"ok": True}
@@ -688,11 +720,11 @@ async def delete_channel(name: str, request: Request):
 @app.put("/api/channels/{name}/schedule", dependencies=[Depends(require_session)])
 async def save_schedule(name: str, body: ScheduleBody, request: Request):
     try:
-        conf = channels.set_blocks(channels.find_station(_confs_dir(), name), body.blocks)
+        conf = channels.set_blocks(channels.find_station(_confs_dir(), name), body.blocks, library_tags())
     except channels.ChannelError as e:
         raise _channel_error(e)
-    await _save_on_tv(fs42_client(request).update_station(name, conf))
     ensure_folders(conf)
+    await _save_on_tv(fs42_client(request).update_station(name, conf))
     fs42_client(request).schedule_rebuild(name)
     return {"ok": True}
 
@@ -702,19 +734,120 @@ async def duplicate_channel(name: str, body: DuplicateBody, request: Request):
     try:
         source = channels.find_station(_confs_dir(), name)
         conf = channels.duplicate_station_conf(source, channels.load_stations(_confs_dir()),
-                                               body.long_name, body.number, body.share_videos)
+                                               body.long_name, body.number, FS42_DIR)
     except channels.ChannelError as e:
         raise _channel_error(e)
-    await _save_on_tv(fs42_client(request).create_station(conf))
-    if not body.share_videos:
-        logo = channels.logo_file(source, FS42_DIR)
-        if logo:
-            folder = channels.logo_folder(conf, FS42_DIR)
-            folder.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(logo, folder / logo.name)
+    # the copy gets the same commercials, cortinillas, fixed videos and logo
+    # (hard links: no extra disk space)
+    src = library.root(FS42_DIR) / channels.channel_dir(source)
+    dest = library.root(FS42_DIR) / channels.channel_dir(conf)
+    if src.is_dir() and not dest.exists():
+        def link(a, b):
+            try:
+                os.link(a, b)
+            except OSError:
+                shutil.copy2(a, b)
+        shutil.copytree(src, dest, copy_function=link)
     ensure_folders(conf)
+    await _save_on_tv(fs42_client(request).create_station(conf))
     fs42_client(request).schedule_rebuild(conf["network_name"], restart=True)
     return {"ok": True, "name": conf["network_name"]}
+
+
+# ---------- the library: categories and programs ----------
+
+class LibraryBody(BaseModel):
+    # existing as {"tag", "label", "programs": [...]}, new ones as plain labels
+    categories: list[str | dict]
+
+
+@app.put("/api/library", dependencies=[Depends(require_session)])
+async def put_library(body: LibraryBody, request: Request):
+    old = library_tree()
+    try:
+        tree = library.clean_tree(body.categories, old)
+    except library.LibraryError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    removed = library.removed_tags(old, tree)
+    for tag in removed:
+        users = channels.channels_using(_confs_dir(), tag)
+        exact = [c for c in channels.load_stations(_confs_dir())
+                 if channels.is_channel(c) and any(u == tag or u.startswith(tag + "/")
+                                                    for u in channels.schedule_tags(c))]
+        if exact:
+            name = exact[0].get("network_long_name") or exact[0]["network_name"]
+            raise HTTPException(status_code=400, detail=f"\"{library.label_of(old, tag)}\" lo usa el canal "
+                                f"{name}. Quítalo primero de ese canal.")
+        del users
+        folder = library.folder(FS42_DIR, tag)
+        real = [v for v in list_videos(folder) if not v["placeholder"]]
+        if real:
+            raise HTTPException(status_code=400, detail=f"\"{library.label_of(old, tag)}\" todavía tiene "
+                                f"{len(real)} videos. Muévelos o bórralos primero.")
+    for tag in sorted(removed, key=lambda t: -t.count("/")):
+        folder = library.folder(FS42_DIR, tag)
+        remove_placeholder(folder)
+        try:
+            folder.rmdir()
+        except OSError:
+            pass
+    await asyncio.to_thread(library.save, FS42_DIR, tree)
+    ensure_library()
+    return {"ok": True, "categories": tree}
+
+
+class VideoRef(BaseModel):
+    channel: str | None = None
+    tag: str | None = None
+    name: str
+
+
+class ManyBody(BaseModel):
+    items: list[VideoRef]
+    to_channel: str | None = None
+    to_tag: str | None = None
+
+
+@app.post("/api/library/move-many", dependencies=[Depends(require_session)])
+async def move_many(body: ManyBody, request: Request):
+    to_ch, to_folder = find_folder(body.to_channel, body.to_tag)
+    client = fs42_client(request)
+    moved = 0
+    sources = set()
+    for item in body.items:
+        ch, folder = find_folder(item.channel, item.tag)
+        path = listed_video(folder, item.name)
+        if path.name in SAMPLE_NAMES or folder == to_folder:
+            continue
+        to_folder.mkdir(parents=True, exist_ok=True)
+        os.replace(path, unique_path(to_folder, path.name))
+        sources.add((item.channel or "", item.tag or ""))
+        moved += 1
+    if moved:
+        after_new_video(to_folder)
+        for channel_name, tag in sources:
+            ch, folder = find_folder(channel_name, tag)
+            fill_if_empty(folder, tag or None)
+            rebuild_for(client, ch, tag)
+        rebuild_for(client, to_ch, body.to_tag)
+    return {"ok": True, "moved": moved}
+
+
+@app.post("/api/library/delete-many", dependencies=[Depends(require_session)])
+async def delete_many(body: ManyBody, request: Request):
+    client = fs42_client(request)
+    deleted = 0
+    touched = set()
+    for item in body.items:
+        ch, folder = find_folder(item.channel, item.tag)
+        listed_video(folder, item.name).unlink()
+        touched.add((item.channel or "", item.tag or ""))
+        deleted += 1
+    for channel_name, tag in touched:
+        ch, folder = find_folder(channel_name, tag)
+        fill_if_empty(folder, tag or None)
+        rebuild_for(client, ch, tag)
+    return {"ok": True, "deleted": deleted}
 
 
 # ---------- bedtime and power ----------
@@ -925,21 +1058,10 @@ async def start_update(request: Request):
 # ---------------------------------------------------------------------------
 # library: durations, thumbnails, moving videos
 
-class LibraryRef(BaseModel):
-    channel: str
-    tag: str | None = None
-    name: str
-
-
-class MoveBody(LibraryRef):
-    to_channel: str
-    to_tag: str | None = None
-
-
 @app.post("/api/library/probe", dependencies=[Depends(require_session)])
 async def probe_folder(request: Request, body: dict):
     """Durations for a folder's videos (measured the first time, then cached)."""
-    _, folder = find_folder(str(body.get("channel", "")), body.get("tag"))
+    _, folder = find_folder(body.get("channel") or None, body.get("tag"))
     info = request.app.state.media
 
     def run():
@@ -957,8 +1079,8 @@ async def probe_folder(request: Request, body: dict):
 
 
 @app.get("/api/library/thumb", dependencies=[Depends(require_session)])
-async def thumbnail(request: Request, channel: str, name: str, tag: str = ""):
-    _, folder = find_folder(channel, tag)
+async def thumbnail(request: Request, name: str, channel: str = "", tag: str = ""):
+    _, folder = find_folder(channel or None, tag)
     path = listed_video(folder, name)
     info = request.app.state.media.cached(path) or {}
     thumb = await asyncio.to_thread(request.app.state.thumbs.get, path, info.get("duration"))
@@ -968,24 +1090,11 @@ async def thumbnail(request: Request, channel: str, name: str, tag: str = ""):
 
 
 @app.post("/api/library/move", dependencies=[Depends(require_session)])
-async def move_video(body: MoveBody, request: Request):
-    ch, folder = find_folder(body.channel, body.tag)
-    path = listed_video(folder, body.name)
-    to_ch, to_folder = find_folder(body.to_channel, body.to_tag)
-    if to_folder == folder:
-        return {"ok": True}
-    to_folder.mkdir(parents=True, exist_ok=True)
-    target = unique_path(to_folder, path.name)
-    try:
-        os.replace(path, target)
-    except OSError:
-        shutil.move(str(path), str(target))
-    after_new_video(to_folder)
-    fill_if_empty(folder, body.tag or None)
-    fs42_client(request).schedule_rebuild(ch["name"])
-    if to_ch["name"] != ch["name"]:
-        fs42_client(request).schedule_rebuild(to_ch["name"])
-    return {"ok": True, "name": target.name}
+async def move_video(body: dict, request: Request):
+    """One video (the older single-move call): same as move-many."""
+    many = ManyBody(items=[VideoRef(channel=body.get("channel"), tag=body.get("tag"), name=str(body.get("name", "")))],
+                    to_channel=body.get("to_channel"), to_tag=body.get("to_tag"))
+    return await move_many(many, request)
 
 
 @app.post("/api/library/convert", dependencies=[Depends(require_session)])
@@ -994,11 +1103,11 @@ async def convert_folder(request: Request, body: dict):
     if CONVERT_BACKEND != "ffmpeg":
         raise HTTPException(status_code=409, detail="La conversión no está disponible en este equipo.")
     count = 0
-    for channel in all_channels():
-        if body.get("channel") and channel["name"] != body["channel"]:
-            continue
-        for folder in channel["folders"]:
-            for _, path, _ in _video_files(Path(folder["path"])):
+    folders = [library.folder(FS42_DIR, tag) for tag in library_tags()]
+    folders += [Path(f["path"]) for channel in all_channels() for f in channel["folders"]]
+    for folder in folders:
+        if True:
+            for _, path, _ in _video_files(folder):
                 if path.name not in SAMPLE_NAMES:
                     request.app.state.converter.add(path)
                     count += 1
@@ -1224,10 +1333,23 @@ async def restore_backup(request: Request, file: UploadFile = File(...)):
             await _save_on_tv(client.create_station(conf))
         if conf.get("network_type") in ("standard", "loop"):
             logo = restored["logos"].get(conf["network_name"])
+            if not channels.is_channel(conf):
+                continue  # an older backup: moved into the library below
             if logo and conf.get("default_logo"):
                 folder = channels.logo_folder(conf, FS42_DIR)
                 folder.mkdir(parents=True, exist_ok=True)
                 (folder / conf["default_logo"]).write_bytes(logo[1])
+            ensure_folders(conf)
+            client.schedule_rebuild(conf["network_name"])
+    if restored.get("library"):
+        merged = restored["library"] + [c for c in library_tree()
+                                        if c["tag"] not in {x["tag"] for x in restored["library"]}]
+        await asyncio.to_thread(library.save, FS42_DIR, merged)
+    # backups from before the shared library
+    await asyncio.to_thread(migrate.migrate, _confs_dir(), FS42_DIR)
+    ensure_library()
+    for conf in channels.load_stations(_confs_dir()):
+        if channels.is_channel(conf):
             ensure_folders(conf)
             client.schedule_rebuild(conf["network_name"])
     state = panel_state(request)
@@ -1254,7 +1376,8 @@ class USBDevice(BaseModel):
 class USBImportBody(BaseModel):
     device: str
     files: list[str]
-    channel: str
+    # no channel: a library category or program
+    channel: str | None = None
     tag: str | None = None
 
 
@@ -1289,7 +1412,7 @@ async def usb_open(body: USBDevice):
 @app.post("/api/usb/import", dependencies=[Depends(require_session)])
 async def usb_import(body: USBImportBody, request: Request):
     _usb_available()
-    ch, folder = find_folder(body.channel, body.tag)
+    ch, folder = find_folder(body.channel or None, body.tag)
     root = await asyncio.to_thread(_usb_call, usb.mount, body.device)
     if not body.files:
         raise HTTPException(status_code=400, detail="Elige al menos un video.")
@@ -1310,7 +1433,7 @@ async def usb_import(body: USBImportBody, request: Request):
         queue_conversion(app_, target)
 
     _usb_call(app_.state.usb_job.start, items, on_file,
-              lambda: from_thread(client.schedule_rebuild, ch["name"]))
+              lambda: from_thread(rebuild_for, client, ch, body.tag))
     return {"ok": True, "job": app_.state.usb_job.status()}
 
 

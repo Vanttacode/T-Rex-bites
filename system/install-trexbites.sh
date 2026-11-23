@@ -172,9 +172,20 @@ for conf in "$FS42_DIR"/confs/*.json; do
         has_channels=1
     fi
 done
+LIBRARY_DIR=$MEDIA_DIR/catalog/biblioteca
+as_tv mkdir -p "$LIBRARY_DIR"
 if [ "$has_channels" = 0 ]; then
     install -o "$TV_USER" -g "$TV_USER" -m 644 "$SRC_DIR"/system/defaults/confs/*.json "$FS42_DIR/confs/"
+    if [ ! -f "$LIBRARY_DIR/.trexbites.json" ]; then
+        install -o "$TV_USER" -g "$TV_USER" -m 644 "$SRC_DIR/system/defaults/biblioteca.json" "$LIBRARY_DIR/.trexbites.json"
+    fi
 fi
+# channel helpers run straight from the source tree
+trex_py() { (cd "$SRC_DIR/panel" && python3 -m "$@"); }
+# channels made before the shared library (v0.5 and earlier) move into it;
+# their videos are moved on the same disk, never copied or deleted
+trex_py trexbites_panel.migrate --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR"
+chown -R "$TV_USER:$TV_USER" "$FS42_DIR/confs" "$LIBRARY_DIR"
 if [ ! -f "$FS42_DIR/confs/main_config.json" ]; then
     API_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')
     cat > "$FS42_DIR/confs/main_config.json" <<EOF
@@ -257,10 +268,11 @@ chmod 644 "$PLACEHOLDER" "$MEDIA_ASSETS/a_dormir.png" "$MEDIA_ASSETS/configurar_
 while IFS= read -r folder; do
     [ -n "$folder" ] || continue
     as_tv mkdir -p "$folder"
-    if [ -z "$(find "$folder" -maxdepth 1 -type f -print -quit)" ]; then
+    # a category whose videos are all in program subfolders is not empty
+    if [ -z "$(find "$folder" -type f ! -name '.*' -print -quit)" ]; then
         as_tv cp "$PLACEHOLDER" "$folder/_bienvenida_trexbites.mp4"
     fi
-done < <(python3 -I "$SRC_DIR/panel/trexbites_panel/channels.py" --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-dirs)
+done < <(trex_py trexbites_panel.channels --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-dirs)
 
 # scheduled channels fill the gaps between programs with short clips
 while IFS= read -r folder; do
@@ -269,7 +281,7 @@ while IFS= read -r folder; do
     if [ -z "$(find "$folder" -maxdepth 1 -type f -print -quit)" ]; then
         as_tv cp "$IDENT" "$folder/_ident_trexbites.mp4"
     fi
-done < <(python3 -I "$SRC_DIR/panel/trexbites_panel/channels.py" --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-bump-dirs)
+done < <(trex_py trexbites_panel.channels --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-bump-dirs)
 
 step "Preparando la programación inicial"
 as_tv bash -c "cd '$FS42_DIR' && env/bin/python3 station_42.py --rebuild_catalog && env/bin/python3 station_42.py --add_week" \

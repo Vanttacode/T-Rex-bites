@@ -42,7 +42,8 @@ def env(tmp_path, monkeypatch):
     fs42 = tmp_path / "fs42"
     shutil.copytree(DEFAULT_CONFS, fs42 / "confs")
     (fs42 / "confs" / "main_config.json").write_text(json.dumps({"api_key": "k" * 20}))
-    (fs42 / "catalog").mkdir()
+    (fs42 / "catalog" / "biblioteca").mkdir(parents=True)
+    shutil.copy(REPO / "system" / "defaults" / "biblioteca.json", fs42 / "catalog" / "biblioteca" / ".trexbites.json")
     placeholder = tmp_path / "media" / "_bienvenida_trexbites.mp4"
     placeholder.parent.mkdir()
     placeholder.write_bytes(b"sample")

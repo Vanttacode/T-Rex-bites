@@ -188,11 +188,11 @@ function showUsbJob(job) {
 async function usbImport() {
   const files = [...$("usb-files").querySelectorAll("input:checked")].map((i) => i.value);
   if (!files.length) { toast("Elige al menos un video"); return; }
-  const channel = $("up-channel").value;
-  const tag = $("up-tag").value;
-  if (!channel) { toast("Primero elige un canal arriba"); return; }
+  const dest = $("up-dest").value;
+  if (!dest) { toast("Primero elige arriba dónde guardarlos"); $("up-dest").focus(); return; }
+  const { channel, tag } = parseDest(dest);
   try {
-    const r = await api("/api/usb/import", { json: { device: usbState.device, files, channel, tag: tag || null } });
+    const r = await api("/api/usb/import", { json: { device: usbState.device, files, channel, tag } });
     usbState.timer = 1;
     showUsbJob(r.job);
   } catch (e) { $("usb-status").textContent = e.message; }

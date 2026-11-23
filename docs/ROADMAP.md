@@ -48,6 +48,13 @@
 - [x] Importar desde pendrive, biblioteca con miniaturas, duración, búsqueda, repetidos y mover.
 - [x] Respaldo y restauración de la configuración.
 
+## ✅ Versión 0.6
+
+- [x] Biblioteca única con categorías y programas, compartida por todos los canales.
+- [x] Canales "Todo el día" (eligen categorías o programas) y "Con horario".
+- [x] Elegir varios videos y moverlos o borrarlos juntos.
+- [x] Mudanza automática de los canales anteriores a la biblioteca.
+
 ## 🔜 Después
 
 - [ ] Imagen para Raspberry Pi.

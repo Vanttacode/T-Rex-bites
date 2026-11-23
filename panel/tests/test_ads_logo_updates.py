@@ -19,10 +19,10 @@ def test_enable_commercials(env):
     assert resp.status_code == 200, resp.text
     conf = conf_of(env)
     assert conf["commercial_free"] is False
-    assert conf["commercial_dir"] == "comerciales"
+    assert conf["commercial_dir"] == "canales/trextv/comerciales"
     assert (conf["break_strategy"], conf["break_duration"]) == ("end", 90)
     # commercials get their own folder with a sample clip, shown in the panel
-    folder = env["fs42"] / "catalog" / "trex_tv" / "comerciales"
+    folder = env["fs42"] / "catalog" / "biblioteca" / "canales" / "trextv" / "comerciales"
     assert (folder / "_ident_trexbites.mp4").exists()
     trex = [ch for ch in c.get("/api/channels").json()["channels"] if ch["name"] == "TRexTV"][0]
     assert trex["ads"] == {"enabled": True, "strategy": "end", "duration": 90}
@@ -58,8 +58,8 @@ def test_channel_logo_upload_and_reset(env):
     resp = c.post("/api/channels/TRexTV/logo", files={"file": ("Mi Logo.PNG", b"\x89PNGfake", "image/png")})
     assert resp.status_code == 200, resp.text
     conf = conf_of(env)
-    assert (conf["logo_dir"], conf["default_logo"]) == ("logos", "logo.png")
-    assert (env["fs42"] / "catalog" / "trex_tv" / "logos" / "logo.png").read_bytes() == b"\x89PNGfake"
+    assert (conf["logo_dir"], conf["default_logo"]) == ("canales/trextv/logos", "logo.png")
+    assert (env["fs42"] / "catalog" / "biblioteca" / "canales" / "trextv" / "logos" / "logo.png").read_bytes() == b"\x89PNGfake"
     assert c.get("/api/channels/TRexTV/logo").content == b"\x89PNGfake"
     assert env["restarts"] == [True]
 
@@ -70,7 +70,7 @@ def test_channel_logo_upload_and_reset(env):
     assert c.delete("/api/channels/TRexTV/logo").status_code == 200
     conf = conf_of(env)
     assert "default_logo" not in conf and "logo_dir" not in conf
-    assert not (env["fs42"] / "catalog" / "trex_tv" / "logos" / "logo.png").exists()
+    assert not (env["fs42"] / "catalog" / "biblioteca" / "canales" / "trextv" / "logos" / "logo.png").exists()
 
 
 def test_version_order():
