@@ -12,7 +12,7 @@ from conftest import login
 from trexbites_panel import channels, media, watch
 
 
-def conf_of(env, name="TRexTV"):
+def conf_of(env, name="T-Rex TV"):
     for path in (env["fs42"] / "confs").glob("*.json"):
         data = json.loads(path.read_text())
         if data.get("station_conf", {}).get("network_name") == name:
@@ -21,13 +21,13 @@ def conf_of(env, name="TRexTV"):
 
 
 def trex(c):
-    return [ch for ch in c.get("/api/channels").json()["channels"] if ch["name"] == "TRexTV"][0]
+    return [ch for ch in c.get("/api/channels").json()["channels"] if ch["name"] == "T-Rex TV"][0]
 
 
 def test_pautas_and_fixed_videos(env):
     c = env["client"]
     login(c)
-    r = c.put("/api/channels/TRexTV", json={"long_name": "T-Rex TV", "number": 3,
+    r = c.put("/api/channels/T-Rex TV", json={"long_name": "T-Rex TV", "number": 3,
                                             "ads": {"enabled": True, "strategy": "end", "duration": 60},
                                             "pautas": ["Juguetes"]})
     assert r.status_code == 200, r.text
@@ -40,7 +40,7 @@ def test_pautas_and_fixed_videos(env):
     week = ch["blocks"]
     week["tuesday"] = [{"start": 9, "end": 12, "kind": "show", "tags": ["dibujos"], "mode": "random",
                         "pauta": "juguetes", "start_video": "intro.mp4", "end_video": "chao.mp4"}]
-    assert c.put("/api/channels/TRexTV/schedule", json={"blocks": week}).status_code == 200
+    assert c.put("/api/channels/T-Rex TV/schedule", json={"blocks": week}).status_code == 200
     day = conf_of(env)["tuesday"]
     assert day["9"]["commercial_dir"] == "canales/trextv/pautas/juguetes"
     assert day["9"]["start_bump"] == "canales/trextv/fijos/intro.mp4"
@@ -50,9 +50,9 @@ def test_pautas_and_fixed_videos(env):
     assert (block["start"], block["end"], block["pauta"], block["start_video"], block["end_video"]) == \
         (9, 12, "juguetes", "intro.mp4", "chao.mp4")
     week["tuesday"][0]["pauta"] = "nope"
-    assert c.put("/api/channels/TRexTV/schedule", json={"blocks": week}).status_code == 400
+    assert c.put("/api/channels/T-Rex TV/schedule", json={"blocks": week}).status_code == 400
     week["tuesday"][0].update(pauta=None, start_video="../x.mp4")
-    assert c.put("/api/channels/TRexTV/schedule", json={"blocks": week}).status_code == 400
+    assert c.put("/api/channels/T-Rex TV/schedule", json={"blocks": week}).status_code == 400
 
 
 def test_upload_with_when_folders(env):
@@ -103,7 +103,7 @@ def test_tv_settings(env):
 def test_parental_flag(env):
     c = env["client"]
     login(c)
-    r = c.put("/api/channels/TRexTV", json={"long_name": "T-Rex TV", "number": 3, "parental": True})
+    r = c.put("/api/channels/T-Rex TV", json={"long_name": "T-Rex TV", "number": 3, "parental": True})
     assert r.status_code == 200
     assert conf_of(env)["parental_controls"] is True
     assert trex(c)["parental"] is True
@@ -116,9 +116,9 @@ def test_backup_roundtrip(env):
                                 "wake_school": "07:00", "wake_weekend": "08:00"})
     data = c.get("/api/backup").content
     zf = zipfile.ZipFile(io.BytesIO(data))
-    assert "manifest.json" in zf.namelist() and "channels/TRexTV.json" in zf.namelist()
+    assert "manifest.json" in zf.namelist() and "channels/T-Rex TV.json" in zf.namelist()
     # change things, then restore
-    c.put("/api/channels/TRexTV", json={"long_name": "Otro nombre", "number": 3})
+    c.put("/api/channels/T-Rex TV", json={"long_name": "Otro nombre", "number": 3})
     r = c.post("/api/backup", files={"file": ("r.zip", data, "application/zip")})
     assert r.status_code == 200, r.text
     assert conf_of(env)["network_long_name"] == "T-Rex TV"
@@ -148,19 +148,19 @@ def test_watch_now_playing(env, tmp_path):
             {"path": str(video), "skip": 5, "duration": 600}]
     con.execute("INSERT INTO liquid_blocks (station, liquid_type, start_time, end_time, break_strategy, title, "
                 "content_json, plan_json) VALUES (?,?,?,?,?,?,?,?)",
-                ("TRexTV", "LiquidClipBlock", str(start), str(start + dt.timedelta(minutes=30)), "end",
+                ("T-Rex TV", "LiquidClipBlock", str(start), str(start + dt.timedelta(minutes=30)), "end",
                  "Dinos", "[]", json.dumps(plan)))
     con.commit()
     con.close()
-    playing = watch.now_playing(fs42, "TRexTV", now)
+    playing = watch.now_playing(fs42, "T-Rex TV", now)
     assert playing["title"] == "Dinos" and playing["offset"] == 45.0
     c = env["client"]
     login(c)
-    r = c.get("/api/watch/TRexTV").json()
+    r = c.get("/api/watch/T-Rex TV").json()
     assert r["playing"]["title"] == "Dinos"
     media_resp = c.get(r["playing"]["url"], headers={"Range": "bytes=0-3"})
     assert media_resp.status_code == 206 and media_resp.content == b"0123"
-    assert c.get("/api/watch/TRexTV/media?p=/etc/passwd").status_code == 404
+    assert c.get("/api/watch/T-Rex TV/media?p=/etc/passwd").status_code == 404
 
 
 def test_ffmpeg_command_decisions(tmp_path):
@@ -267,3 +267,10 @@ def test_migration_moves_everything_into_the_library(env):
     assert [p["tag"] for p in cats["dibujos"]["programs"]] == ["bluey"]
     # running it again changes nothing
     assert migrate.migrate(fs42 / "confs", fs42) == 0
+    # the TV shows the visible name, not the old internal id
+    assert migrate.sync_names(fs42 / "confs") == 2
+    names = {ch["name"] for ch in c.get("/api/channels").json()["channels"]}
+    assert names == {"T-Rex TV", "Oliver TV", "Otro"}
+    loop = json.loads((fs42 / "confs" / "dino_loop.json").read_text())["station_conf"]
+    assert loop["trexbites"]["folder"] == "canales/dinoloop"
+    assert migrate.sync_names(fs42 / "confs") == 0

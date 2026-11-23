@@ -516,15 +516,27 @@ def _clean_number(number, stations, own_name=None):
     return number
 
 
-def _unique_network_name(long_name, stations, fs42_dir=None):
-    base = "".join(w.capitalize() for w in slugify(long_name).split("_"))[:24] or "Canal"
-    taken = {s["network_name"].lower() for s in stations}
+def display_name(long_name, stations, own_name=None):
+    """FieldStation42's network_name. The TV shows it on screen when the channel
+    changes, so it is the channel's visible name (unique among channels)."""
+    base = long_name.replace("/", "-").strip() or "Canal"
+    taken = {s["network_name"].lower() for s in stations if s["network_name"] != own_name}
     name, n = base, 2
-    while (name.lower() in taken or name.lower() in ("main_config",)
-           or (fs42_dir and library.channel_root(fs42_dir, name).exists())):
-        name = f"{base}{n}"
+    while name.lower() in taken or slugify(name) in ("main_config", ""):
+        name = f"{base} {n}"
         n += 1
     return name
+
+
+def unique_channel_folder(name, stations, fs42_dir=None):
+    """canales/<slug>, not used by another channel nor already on disk."""
+    used = {channel_dir(s) for s in stations if is_channel(s)}
+    base = f"{library.CHANNELS_DIR}/{slugify(name) or 'canal'}"
+    folder, n = base, 2
+    while folder in used or (fs42_dir and (library.root(fs42_dir) / folder).exists()):
+        folder = f"{base}{n}"
+        n += 1
+    return folder
 
 
 def default_week(first_tag):
@@ -539,7 +551,7 @@ def new_station_conf(stations, long_name, number, kind_, tags, valid_tags, mode=
         raise ChannelError("Tipo de canal inválido.")
     number = _clean_number(number, stations)
     tags = _clean_tags(tags, set(valid_tags))
-    name = _unique_network_name(long_name, stations, fs42_dir)
+    name = display_name(long_name, stations)
     conf = {
         "network_name": name,
         "network_long_name": long_name,
@@ -552,7 +564,7 @@ def new_station_conf(stations, long_name, number, kind_, tags, valid_tags, mode=
         "break_strategy": "end",
         "break_duration": 120,
         **RUNTIME_MEDIA,
-        "trexbites": {"kind": kind_, "folder": f"{library.CHANNELS_DIR}/{slugify(name)}"},
+        "trexbites": {"kind": kind_, "folder": unique_channel_folder(name, stations, fs42_dir)},
     }
     conf["bump_dir"] = f"{channel_dir(conf)}/{BUMP_DIR}"
     if kind_ == "allday":
@@ -581,14 +593,25 @@ def rewrite_channel_paths(conf, old_dir, new_dir):
     conf.setdefault("trexbites", {})["folder"] = new_dir
 
 
+def rename(conf, stations):
+    """Keep network_name (what the TV shows) equal to the visible name. The
+    channel's folder is stored first, so renaming never moves files."""
+    if not is_channel(conf):
+        return
+    conf.setdefault("trexbites", {}).setdefault("folder", channel_dir(conf))
+    wanted = display_name(conf.get("network_long_name") or conf["network_name"], stations,
+                          own_name=conf["network_name"])
+    conf["network_name"] = wanted
+
+
 def duplicate_station_conf(conf, stations, long_name, number, fs42_dir=None):
     """A copy of a channel: same schedule, commercials settings and logo; it
     plays the same library videos and gets its own channel folder."""
     new = copy.deepcopy(conf)
     new["network_long_name"] = clean_label(long_name, "El nombre del canal")
     new["channel_number"] = _clean_number(number, stations)
-    new["network_name"] = _unique_network_name(new["network_long_name"], stations, fs42_dir)
-    rewrite_channel_paths(new, channel_dir(conf), f"{library.CHANNELS_DIR}/{slugify(new['network_name'])}")
+    new["network_name"] = display_name(new["network_long_name"], stations)
+    rewrite_channel_paths(new, channel_dir(conf), unique_channel_folder(new["network_name"], stations, fs42_dir))
     new.pop("schedule_path", None)
     new.pop("catalog_path", None)
     return new
@@ -655,6 +678,7 @@ def update_station_conf(conf, stations, long_name, number, ads=None, logo=None, 
     conf = copy.deepcopy(conf)
     conf["network_long_name"] = clean_label(long_name, "El nombre del canal")
     conf["channel_number"] = _clean_number(number, stations, own_name=conf["network_name"])
+    rename(conf, stations)
     if allday is not None:
         if kind(conf) != "allday":
             raise ChannelError("Este canal tiene horario: se arma en el editor de programación.")

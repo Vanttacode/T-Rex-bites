@@ -73,7 +73,7 @@ def test_upload_lands_in_library_and_rebuilds_channels_using_it(env):
     target = env["fs42"].joinpath(*LIB, "dibujos", "Capitulo 1.mp4")
     assert target.read_bytes() == b"fake-video"
     # both default channels play dibujos
-    assert sorted(env["rebuilds"]) == [("DinoLoop", False), ("TRexTV", False)]
+    assert sorted(env["rebuilds"]) == [("Dino Loop", False), ("T-Rex TV", False)]
 
     # same name again gets a new name instead of overwriting
     resp = c.post("/api/upload", data={"tag": "dibujos"},

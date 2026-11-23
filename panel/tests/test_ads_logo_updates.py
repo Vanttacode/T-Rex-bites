@@ -12,7 +12,7 @@ def conf_of(env, name="trex_tv.json"):
 def test_enable_commercials(env):
     c = env["client"]
     login(c)
-    resp = c.put("/api/channels/TRexTV", json={
+    resp = c.put("/api/channels/T-Rex TV", json={
         "long_name": "T-Rex TV", "number": 3,
         "ads": {"enabled": True, "strategy": "end", "duration": 90},
     })
@@ -24,13 +24,13 @@ def test_enable_commercials(env):
     # commercials get their own folder with a sample clip, shown in the panel
     folder = env["fs42"] / "catalog" / "biblioteca" / "canales" / "trextv" / "comerciales"
     assert (folder / "_ident_trexbites.mp4").exists()
-    trex = [ch for ch in c.get("/api/channels").json()["channels"] if ch["name"] == "TRexTV"][0]
+    trex = [ch for ch in c.get("/api/channels").json()["channels"] if ch["name"] == "T-Rex TV"][0]
     assert trex["ads"] == {"enabled": True, "strategy": "end", "duration": 90}
     assert "_comerciales" in [f["tag"] for f in trex["folders"]]
-    assert env["rebuilds"] == [("TRexTV", True)]
+    assert env["rebuilds"] == [("T-Rex TV", True)]
 
     # the first real commercial replaces the sample
-    c.post("/api/upload", data={"channel": "TRexTV", "tag": "_comerciales"},
+    c.post("/api/upload", data={"channel": "T-Rex TV", "tag": "_comerciales"},
            files={"file": ("lavate-los-dientes.mp4", b"x", "video/mp4")})
     assert sorted(p.name for p in folder.iterdir()) == ["lavate-los-dientes.mp4"]
 
@@ -38,36 +38,36 @@ def test_enable_commercials(env):
 def test_commercials_validation_and_disable(env):
     c = env["client"]
     login(c)
-    bad = c.put("/api/channels/TRexTV", json={"long_name": "T-Rex TV", "number": 3,
+    bad = c.put("/api/channels/T-Rex TV", json={"long_name": "T-Rex TV", "number": 3,
                                               "ads": {"enabled": True, "strategy": "nunca"}})
     assert bad.status_code == 400
-    bad = c.put("/api/channels/TRexTV", json={"long_name": "T-Rex TV", "number": 3,
+    bad = c.put("/api/channels/T-Rex TV", json={"long_name": "T-Rex TV", "number": 3,
                                               "ads": {"enabled": True, "duration": 5}})
     assert bad.status_code == 400
-    loop = c.put("/api/channels/DinoLoop", json={"long_name": "Dino Loop", "number": 5,
+    loop = c.put("/api/channels/Dino Loop", json={"long_name": "Dino Loop", "number": 5,
                                                  "ads": {"enabled": True}})
     assert loop.status_code == 400
-    c.put("/api/channels/TRexTV", json={"long_name": "T-Rex TV", "number": 3, "ads": {"enabled": False}})
+    c.put("/api/channels/T-Rex TV", json={"long_name": "T-Rex TV", "number": 3, "ads": {"enabled": False}})
     assert conf_of(env)["commercial_free"] is True
 
 
 def test_channel_logo_upload_and_reset(env):
     c = env["client"]
     login(c)
-    assert c.post("/api/channels/TRexTV/logo", files={"file": ("logo.exe", b"x", "application/x")}).status_code == 400
-    resp = c.post("/api/channels/TRexTV/logo", files={"file": ("Mi Logo.PNG", b"\x89PNGfake", "image/png")})
+    assert c.post("/api/channels/T-Rex TV/logo", files={"file": ("logo.exe", b"x", "application/x")}).status_code == 400
+    resp = c.post("/api/channels/T-Rex TV/logo", files={"file": ("Mi Logo.PNG", b"\x89PNGfake", "image/png")})
     assert resp.status_code == 200, resp.text
     conf = conf_of(env)
     assert (conf["logo_dir"], conf["default_logo"]) == ("canales/trextv/logos", "logo.png")
     assert (env["fs42"] / "catalog" / "biblioteca" / "canales" / "trextv" / "logos" / "logo.png").read_bytes() == b"\x89PNGfake"
-    assert c.get("/api/channels/TRexTV/logo").content == b"\x89PNGfake"
+    assert c.get("/api/channels/T-Rex TV/logo").content == b"\x89PNGfake"
     assert env["restarts"] == [True]
 
-    c.put("/api/channels/TRexTV", json={"long_name": "T-Rex TV", "number": 3,
+    c.put("/api/channels/T-Rex TV", json={"long_name": "T-Rex TV", "number": 3,
                                         "logo": {"show": True, "permanent": False}})
     assert conf_of(env)["logo_permanent"] is False
 
-    assert c.delete("/api/channels/TRexTV/logo").status_code == 200
+    assert c.delete("/api/channels/T-Rex TV/logo").status_code == 200
     conf = conf_of(env)
     assert "default_logo" not in conf and "logo_dir" not in conf
     assert not (env["fs42"] / "catalog" / "biblioteca" / "canales" / "trextv" / "logos" / "logo.png").exists()

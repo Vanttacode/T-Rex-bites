@@ -132,6 +132,14 @@ class TVPower:
         return self._run(["systemctl", "--user", *args], env=env,
                          capture_output=True, text=True, timeout=20)
 
+    def restart_tv(self):
+        """Restart the player and the on-screen display, only if they are on
+        (at bedtime they stay off). Returns True on success."""
+        result = self._systemctl("try-restart", "fs42.service", "fs42-osd.service")
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "no se pudo reiniciar la tele")
+        return True
+
     def apply(self, state):
         unit = UNITS[state]
         try:

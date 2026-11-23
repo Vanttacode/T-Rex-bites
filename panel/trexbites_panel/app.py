@@ -178,6 +178,10 @@ app.state.media = media.MediaInfo(MEDIA_CACHE)
 app.state.thumbs = media.Thumbnails(THUMBS_DIR)
 app.state.converter = media.Converter(app.state.media, lambda: tv_settings(app.state.panel), _converted)
 app.state.usb_job = usb.ImportJob()
+if POWER_BACKEND == "systemd":
+    # restart the TV's own services directly: the player and the on-screen logo
+    # only read channel names and logos when they start
+    app.state.fs42.restart_fn = app.state.tv_power.restart_tv
 _login_failures = defaultdict(deque)
 
 
@@ -698,11 +702,12 @@ async def edit_channel(name: str, body: EditChannelBody, request: Request):
     ensure_folders(conf)
     await _save_on_tv(fs42_client(request).update_station(name, conf))
     # the player and the on-screen logo only read channel settings when they start
-    watched = ("channel_number", "network_long_name", "commercial_free", "break_strategy",
+    watched = ("network_name", "channel_number", "network_long_name", "commercial_free", "break_strategy",
                "break_duration", "show_logo", "logo_permanent", "parental_controls")
     restart = any(old.get(key) != conf.get(key) for key in watched)
-    fs42_client(request).schedule_rebuild(name, restart=restart)
-    return {"ok": True}
+    # a new name is saved under the old one (FieldStation42 renames it)
+    fs42_client(request).schedule_rebuild(conf["network_name"], restart=restart)
+    return {"ok": True, "name": conf["network_name"]}
 
 
 @app.delete("/api/channels/{name}", dependencies=[Depends(require_session)])

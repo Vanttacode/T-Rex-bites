@@ -273,12 +273,33 @@ def migrate(confs_dir, fs42_dir):
     return len(todo)
 
 
+def sync_names(confs_dir):
+    """Older channels used an internal id ("DinoLoop") that the TV showed on
+    screen; the visible name ("Oliver TV") replaces it."""
+    files = list(channels._station_files(Path(confs_dir)))
+    stations = [conf for _, conf in files]
+    changed = 0
+    for path, conf in files:
+        if not channels.is_channel(conf):
+            continue
+        before = conf["network_name"]
+        channels.rename(conf, stations)
+        if conf["network_name"] != before or "folder" not in (conf.get("trexbites") or {}):
+            log(f"el canal {before} ahora se llama {conf['network_name']} en la tele")
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"station_conf": conf}, indent=2, ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, path)
+            changed += 1
+    return changed
+
+
 def main():
     parser = argparse.ArgumentParser(description="Move T-Rex Bites channels into the shared library")
     parser.add_argument("--confs", required=True)
     parser.add_argument("--fs42", required=True)
     args = parser.parse_args()
     migrate(args.confs, args.fs42)
+    sync_names(args.confs)
 
 
 if __name__ == "__main__":

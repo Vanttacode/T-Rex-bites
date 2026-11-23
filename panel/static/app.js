@@ -97,9 +97,24 @@ async function submitPin() {
 
 // ---------- tabs ----------
 
+const PAGES = {
+  remote: ["Control", "Cambia de canal, sube o baja el volumen, mira qué está dando."],
+  upload: ["Subir videos", "A la biblioteca (para todos los canales) o a lo propio de un canal."],
+  library: ["Programas", "La biblioteca de la tele: categorías, programas y todos sus videos."],
+  schedule: ["Horarios", "Hora de dormir y la programación de los canales."],
+  more: ["Más", "Canales, WiFi, opciones de la tele, guía, respaldo y actualizaciones."],
+};
+const wide = window.matchMedia("(min-width: 1000px)");
+let currentTab = "remote";
+
 function showTab(name) {
+  if (!PAGES[name]) name = "remote";
+  currentTab = name;
   document.querySelectorAll(".tab").forEach((t) => { t.hidden = t.id !== `tab-${name}`; });
   document.querySelectorAll(".tabbar button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  $("page-title").textContent = PAGES[name][0];
+  $("page-sub").textContent = PAGES[name][1];
+  if (location.hash !== `#${name}`) history.replaceState(null, "", `#${name}`);
   if (name === "library") renderLibrary();
   if (name === "upload") refreshDisk();
   if (name === "schedule") openScheduleTab();
@@ -125,6 +140,9 @@ async function refreshStatus() {
     const asleep = s.power && s.power.state === "off";
     const notTv = s.power && s.power.state !== "on";
     $("onair").hidden = !s.online || notTv;
+    $("onair-desk").hidden = !s.online || notTv;
+    const playing = s.online && !notTv ? (s.player || {}).channel_number : null;
+    if (playing !== currentChannel) { currentChannel = playing; renderChannelButtons(); }
     $("sleeping").hidden = !asleep;
     const p = s.player || {};
     const now = $("now-playing");
@@ -135,7 +153,7 @@ async function refreshStatus() {
     } else {
       now.replaceChildren(
         "Canal ", el("b", {}, String(p.channel_number ?? "?")),
-        ` · ${p.network_name || ""}`, el("br"),
+        ` · ${(channelsCache.find((c) => c.number === p.channel_number) || {}).long_name || p.network_name || ""}`, el("br"),
         p.title ? `Ahora: ${p.title}` : "Sin programa en este momento",
       );
     }
@@ -145,10 +163,15 @@ async function refreshStatus() {
   } catch (_) { /* toast already shown or logged out */ }
 }
 
+let currentChannel = null;
+
 function renderChannelButtons() {
   $("channel-buttons").replaceChildren(...channelsCache.map((c) => el("button", {
-    class: "chbtn", onclick: () => sendRemote("channel", c.number),
-  }, el("span", { class: "num" }, String(c.number)), c.long_name)));
+    class: "chbtn" + (c.number === currentChannel ? " current" : ""), onclick: () => sendRemote("channel", c.number),
+    title: `Poner el canal ${c.number}`,
+  }, el("img", { class: "chlogo", alt: "", loading: "lazy",
+    src: `/api/channels/${encodeURIComponent(c.name)}/logo?v=${c.logo && c.logo.custom ? "c" : "d"}` }),
+  el("span", { class: "chtext" }, el("span", { class: "num" }, String(c.number)), el("span", {}, c.long_name)))));
 }
 
 async function sendDigit(d) {
@@ -387,6 +410,7 @@ function folderBlock(channel, f, q, sizes) {
 }
 
 function drawLibrary() {
+  if (wide.matches) { drawLibraryDesktop(); return; }
   const q = $("lib-search").value.trim().toLowerCase();
   const sizes = {};
   const count = (folders) => folders.forEach((f) => f.videos.forEach((v) => { if (!v.placeholder) sizes[v.size] = (sizes[v.size] || 0) + 1; }));
@@ -403,6 +427,104 @@ function drawLibrary() {
     if (any) cards.push(card);
   }
   $("library").replaceChildren(...cards);
+  updateSelbar();
+}
+
+// ---------- library on a computer: folder tree + video grid ----------
+
+let libCurrent = null;   // "channel|tag" of the folder on the right
+
+function allFolders() {
+  const list = libraryCache.folders.map((f) => ({ channel: null, f }));
+  channelsCache.forEach((c) => c.folders.forEach((f) => list.push({ channel: c.name, chLabel: `${c.number} · ${c.long_name}`, f })));
+  return list;
+}
+
+function videoCard(channel, f, v, sizes) {
+  const k = selKey(channel, f.tag, v.name);
+  const qs = `channel=${encodeURIComponent(channel || "")}&tag=${encodeURIComponent(f.tag ?? "")}&name=${encodeURIComponent(v.name)}`;
+  const box = el("input", { type: "checkbox", "aria-label": `Elegir ${v.name}` });
+  box.checked = selection.has(k);
+  box.disabled = v.placeholder;
+  const card = el("label", { class: "vcard" + (box.checked ? " picked" : ""), title: v.name },
+    box, el("img", { alt: "", loading: "lazy", src: `/api/library/thumb?${qs}` }));
+  if (v.duration != null) card.append(el("span", { class: "dur" }, fmtDuration(v.duration)));
+  const meta = [formatSize(v.size)];
+  const body = el("div", { class: "vbody" }, el("div", { class: "vname" }, v.file || v.name));
+  const badges = el("div", { class: "vmeta" }, meta.join(" · "));
+  if (v.placeholder) badges.append(el("span", { class: "badge" }, "de ejemplo"));
+  if (v.when) badges.append(el("span", { class: "badge when" }, "🕒 " + v.when));
+  if (!v.placeholder && sizes[v.size] > 1) badges.append(el("span", { class: "badge dup" }, "repetido"));
+  body.append(badges);
+  card.append(body);
+  box.addEventListener("change", () => {
+    if (box.checked) selection.set(k, { channel, tag: f.tag, name: v.name }); else selection.delete(k);
+    card.classList.toggle("picked", box.checked);
+    updateSelbar();
+  });
+  return card;
+}
+
+function drawLibraryDesktop() {
+  const q = $("lib-search").value.trim().toLowerCase();
+  const folders = allFolders();
+  const sizes = {};
+  libraryCache.folders.forEach((f) => f.videos.forEach((v) => { if (!v.placeholder) sizes[v.size] = (sizes[v.size] || 0) + 1; }));
+  const keyOf = (x) => `${x.channel || ""}|${x.f.tag}`;
+  if (!libCurrent || !folders.some((x) => keyOf(x) === libCurrent)) {
+    const first = folders.find((x) => x.f.videos.some((v) => !v.placeholder)) || folders[0];
+    libCurrent = first ? keyOf(first) : null;
+  }
+
+  const tree = el("aside", { class: "card lib-tree" }, el("h3", {}, "📚 Biblioteca"));
+  let lastChannel = null;
+  for (const x of folders) {
+    if (x.channel && x.channel !== lastChannel) { tree.append(el("h3", {}, `📺 ${x.chLabel}`)); lastChannel = x.channel; }
+    const real = x.f.videos.filter((v) => !v.placeholder).length;
+    const program = x.f.tag && x.f.tag.includes("/");
+    const label = program ? `↳ ${x.f.label.split(" › ").pop()}` : x.f.label;
+    tree.append(el("button", {
+      class: "tree-item" + (program ? " program" : "") + (keyOf(x) === libCurrent && !q ? " active" : ""), type: "button",
+      onclick: () => { libCurrent = keyOf(x); $("lib-search").value = ""; drawLibraryDesktop(); probeFolder(x.channel, x.f); },
+    }, el("span", {}, label), el("span", { class: "count" }, String(real))));
+  }
+
+  const pane = el("section", { class: "card lib-pane" });
+  const shown = q ? folders.filter((x) => x.f.videos.some((v) => v.name.toLowerCase().includes(q)))
+    : folders.filter((x) => keyOf(x) === libCurrent);
+  if (q) pane.append(el("div", { class: "pane-head" }, el("h2", {}, `🔎 "${$("lib-search").value.trim()}"`)));
+  if (!shown.length) pane.append(el("p", { class: "muted" }, q ? "Ningún video coincide." : "Elige una carpeta a la izquierda."));
+  for (const x of shown) {
+    const videos = x.f.videos.filter((v) => !q || v.name.toLowerCase().includes(q));
+    const real = videos.filter((v) => !v.placeholder);
+    const total = real.reduce((t, v) => t + (v.duration || 0), 0);
+    const where = x.channel ? `${x.chLabel} › ${x.f.label}` : x.f.label;
+    const all = el("input", { type: "checkbox" });
+    all.checked = real.length > 0 && real.every((v) => selection.has(selKey(x.channel, x.f.tag, v.name)));
+    all.disabled = !real.length;
+    all.addEventListener("change", () => {
+      real.forEach((v) => {
+        const k = selKey(x.channel, x.f.tag, v.name);
+        if (all.checked) selection.set(k, { channel: x.channel, tag: x.f.tag, name: v.name }); else selection.delete(k);
+      });
+      drawLibraryDesktop();
+    });
+    const head = el("div", { class: "pane-head" },
+      el(q ? "h3" : "h2", { class: q ? "group-title" : "" }, where),
+      el("span", { class: "muted grow" }, `${real.length} videos${total ? " · " + fmtDuration(total) : ""}`),
+      el("label", { class: "switch" }, all, " Elegir todos"));
+    if (!q) {
+      head.append(el("button", { class: "btn small", type: "button", onclick: () => {
+        $("up-dest").value = destValue(x.channel, x.f.tag); updateDropLabel(); showTab("upload");
+      } }, "📤 Subir aquí"));
+    }
+    pane.append(head);
+    if (!videos.length) pane.append(el("p", { class: "muted" }, "Todavía no hay videos aquí."));
+    else pane.append(el("div", { class: "vgrid" }, ...videos.map((v) => videoCard(x.channel, x.f, v, x.channel ? {} : sizes))));
+  }
+  $("library").replaceChildren(el("div", { class: "lib2" }, tree, pane));
+  const current = folders.find((x) => keyOf(x) === libCurrent);
+  if (current && !q) probeFolder(current.channel, current.f);
   updateSelbar();
 }
 
@@ -446,7 +568,7 @@ async function probeFolder(channel, f) {
     const res = await api("/api/library/probe", { json: { channel, tag: f.tag } });
     let changed = false;
     f.videos.forEach((v) => { if (res.durations[v.name] != null && v.duration == null) { v.duration = res.durations[v.name]; changed = true; } });
-    if (changed) drawLibrary();
+    if (changed && currentTab === "library") drawLibrary();
   } catch (_) { /* durations are a nice-to-have */ }
 }
 
@@ -545,7 +667,7 @@ async function startApp(pinIsDefault) {
     $("pin-card").scrollIntoView();
     toast("Por seguridad, cambia el PIN de fábrica");
   } else {
-    showTab("remote");
+    showTab(location.hash.slice(1) || "remote");
   }
   try { await loadChannels(); } catch (e) { toast(e.message); }
   refreshStatus();
@@ -568,6 +690,8 @@ function wireUp() {
   $("sel-clear").addEventListener("click", () => { selection.clear(); drawLibrary(); });
   ["up-when-part", "up-when-day", "up-when-month"].forEach((id) => $(id).addEventListener("change", whenSummary));
   $("lib-search").addEventListener("input", drawLibrary);
+  wide.addEventListener("change", () => { if (currentTab === "library") drawLibrary(); });
+  window.addEventListener("hashchange", () => { const t = location.hash.slice(1); if (t && t !== currentTab && !$("view-app").hidden) showTab(t); });
   const tvKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", ""];
   $("tv-keypad").replaceChildren(...tvKeys.map((k) => el("button", {
     class: "key", type: "button", onclick: () => k && sendDigit(k === "⌫" ? "clear" : k),

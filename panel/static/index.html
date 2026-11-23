@@ -37,8 +37,17 @@
 
   <!-- App -->
   <main id="view-app" hidden>
+    <header class="page-head">
+      <div>
+        <h1 id="page-title">Control</h1>
+        <p id="page-sub" class="muted"></p>
+      </div>
+      <span class="onair" id="onair-desk" hidden>● EN EL AIRE</span>
+    </header>
     <!-- Control -->
     <section id="tab-remote" class="tab">
+      <div class="cols">
+      <div class="col">
       <div class="card">
         <div class="now" id="now-playing">Conectando con la tele…</div>
       </div>
@@ -55,13 +64,19 @@
         <p class="muted small">Escribe el PIN de canales y aparece en la tele.</p>
         <div class="keypad" id="tv-keypad"></div>
       </div>
+      </div>
+      <div class="col">
       <h3 class="section-title">Canales</h3>
       <div class="channel-list" id="channel-buttons"></div>
-      <a class="btn ghost wide" href="/ver">📱 Ver un canal en este aparato</a>
+      <a class="btn ghost wide mobile-only" href="/ver">📱 Ver un canal en este aparato</a>
+      </div>
+      </div>
     </section>
 
     <!-- Upload -->
     <section id="tab-upload" class="tab" hidden>
+      <div class="cols">
+      <div class="col">
       <div class="card">
         <h2>Subir programas</h2>
         <label class="field">¿Dónde lo guardo?
@@ -83,6 +98,8 @@
         </label>
         <p class="muted" id="disk-info"></p>
       </div>
+      </div>
+      <div class="col">
       <ul class="uploads" id="upload-list"></ul>
 
       <div class="card" id="usb-card">
@@ -103,11 +120,13 @@
         </div>
         <p class="power-line" id="usb-status"></p>
       </div>
+      </div>
+      </div>
     </section>
 
     <!-- Library -->
     <section id="tab-library" class="tab" hidden>
-      <div class="card">
+      <div class="card lib-head">
         <div class="card-head">
           <h2>📚 Biblioteca</h2>
           <button class="btn small ghost" id="lib-organize">✏️ Categorías y programas</button>
@@ -143,6 +162,8 @@
 
     <!-- Schedule + bedtime -->
     <section id="tab-schedule" class="tab" hidden>
+      <div class="cols">
+      <div class="col">
       <div class="card" id="bedtime-card">
         <h2>🌙 Hora de dormir</h2>
         <p class="power-line" id="power-line">…</p>
@@ -160,6 +181,8 @@
           <p class="error" id="bt-msg" role="status"></p>
         </details>
       </div>
+      </div>
+      <div class="col">
 
       <div class="card">
         <h2>🗓 Programación</h2>
@@ -168,10 +191,12 @@
         <p class="power-line"><b id="editor-url">http://trexbites.local/programacion</b></p>
         <a class="btn" href="/programacion">Abrir el editor aquí</a>
       </div>
+      </div>
+      </div>
     </section>
 
     <!-- More -->
-    <section id="tab-more" class="tab" hidden>
+    <section id="tab-more" class="tab masonry" hidden>
       <div class="card" id="wifi-card">
         <div class="card-head">
           <h2>📶 WiFi</h2>
@@ -346,11 +371,16 @@
     </section>
 
     <nav class="tabbar">
+      <div class="side-brand"><img src="/static/icon.svg" alt=""><div><b>T-Rex Bites</b><small>Panel de la tele</small></div></div>
       <button data-tab="remote" class="active">🎮<span>Control</span></button>
       <button data-tab="upload">📤<span>Subir</span></button>
       <button data-tab="library">📚<span>Programas</span></button>
       <button data-tab="schedule">🗓<span>Horarios</span></button>
       <button data-tab="more">☰<span>Más</span></button>
+      <div class="side-links">
+        <a href="/programacion">🗓 Editor de programación</a>
+        <a href="/ver" target="_blank" rel="noopener">📱 Ver un canal aquí</a>
+      </div>
     </nav>
   </main>
 
