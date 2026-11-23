@@ -1,5 +1,5 @@
 "use strict";
-// Management screens: bedtime, weekly schedule, channels and history.
+// Settings screens: bedtime and history.
 // Uses $, api, el, toast, loadChannels and channelsCache from app.js.
 
 const DAYS = [
@@ -26,7 +26,7 @@ function fmtTime(iso) {
 }
 
 function powerText(power) {
-  if (power && power.state === "setup") return "📶 La tele espera que le configures el WiFi (Más → WiFi).";
+  if (power && power.state === "setup") return "📶 La tele espera que le configures el WiFi (Ajustes → WiFi).";
   if (!power || power.state === "on") {
     if (power && power.reason === "extra") return `⏰ Hora extra hasta ${fmtTime(power.until)}`;
     return "📺 La tele está encendida.";
@@ -85,207 +85,16 @@ async function setPower(mode) {
   } catch (e) { toast(e.message); }
 }
 
-// ---------- schedule tab ----------
-// The timeline editor lives in /programacion (made for a computer); on the
-// phone this tab keeps bedtime and a link to it.
+// ---------- settings tab ----------
 
-function openScheduleTab() {
+function openSettingsTab() {
+  redrawCurrent = () => {};
   loadBedtime();
-  $("editor-url").textContent = `http://${location.host}/programacion`;
-}
-
-// ---------- channels ----------
-
-const editor = { channel: null, pautas: [] };
-
-function contentLabel(tag) {
-  return (libraryCache.content.find((c) => c.tag === tag) || { label: tag }).label;
-}
-
-function typeLabel(c) {
-  if (c.kind === "allday") {
-    const what = (c.allday && c.allday.tags.length) ? c.allday.tags.map(contentLabel).join(" + ") : "nada";
-    return `🔁 Todo el día · ${what}${c.parental ? " · 🔒" : ""}`;
-  }
-  return `🗓 Con horario${c.ads && c.ads.enabled ? " · 📺 comerciales" : ""}${c.parental ? " · 🔒" : ""}`;
-}
-
-async function openMoreTab() {
   loadWifi();
   loadTvSettings();
   loadGuide();
   loadUpdate(false);
   renderHistory();
-  try { await loadChannels(); } catch (e) { toast(e.message); return; }
-  $("ch-list").replaceChildren(...channelsCache.map((c) => el("div", { class: "ch-row" },
-    el("span", { class: "num" }, String(c.number)),
-    el("span", { class: "info" }, c.long_name, el("small", {}, typeLabel(c))),
-    el("button", { class: "btn small ghost", onclick: () => openEditor(c) }, "Editar"))));
-}
-
-function nextFreeNumber() {
-  const used = new Set(channelsCache.map((c) => c.number));
-  for (let n = 2; n < 100; n++) if (!used.has(n)) return n;
-  return 99;
-}
-
-function editorKind() {
-  return editor.channel ? editor.channel.kind : document.querySelector('input[name="ch-type"]:checked').value;
-}
-
-function openEditor(channel) {
-  editor.channel = channel;
-  editor.pautas = channel ? (channel.pautas || []).map((x) => ({ ...x })) : [];
-  $("ch-editor-title").textContent = channel ? `Editar: ${channel.long_name}` : "Nuevo canal";
-  $("ch-name").value = channel ? channel.long_name : "";
-  $("ch-number").value = channel ? channel.number : nextFreeNumber();
-  $("ch-type-field").hidden = !!channel;
-  document.querySelector('input[name="ch-type"][value="allday"]').checked = true;
-  $("ch-delete").hidden = !channel;
-  $("ch-msg").textContent = "";
-  const scheduled = channel && channel.kind === "schedule";
-  $("ch-ads-field").hidden = !scheduled;
-  $("ch-logo-field").hidden = !channel;
-  $("ch-new-note").hidden = !!channel;
-  $("ch-parental-field").hidden = !channel;
-  $("ch-parental").checked = !!(channel && channel.parental);
-  if (scheduled) {
-    const ads = channel.ads || { enabled: false, strategy: "end", duration: 120 };
-    $("ch-ads-on").checked = ads.enabled;
-    $("ch-ads-strategy").value = ads.strategy;
-    const dur = $("ch-ads-duration");
-    if (![...dur.options].some((o) => Number(o.value) === ads.duration)) {
-      dur.append(el("option", { value: String(ads.duration) }, `${ads.duration} segundos`));
-    }
-    dur.value = String(ads.duration);
-    $("ch-ads-opts").hidden = !ads.enabled;
-  }
-  if (channel) {
-    const logo = channel.logo || { show: true, permanent: true, custom: false };
-    $("ch-logo-show").checked = logo.show;
-    $("ch-logo-permanent").checked = logo.permanent;
-    $("ch-logo-reset").hidden = !logo.custom;
-    refreshLogoPreview(channel.name);
-  }
-  const current = channel && channel.allday ? channel.allday : { tags: [], mode: "random" };
-  document.querySelector(`input[name="ch-mode"][value="${current.mode}"]`).checked = true;
-  renderContent(current.tags);
-  renderPautas();
-  $("ch-editor").hidden = false;
-  $("ch-editor").scrollIntoView({ behavior: "smooth" });
-}
-
-function renderContent(selected) {
-  const k = editorKind();
-  // an existing schedule channel picks its content block by block in the editor
-  $("ch-content-field").hidden = !!editor.channel && k === "schedule";
-  $("ch-mode-field").hidden = k !== "allday";
-  $("ch-content-title").textContent = k === "allday" ? "¿Qué pasa este canal todo el día?"
-    : "¿Con qué empieza? (después lo armas en el editor de programación)";
-  $("ch-content").replaceChildren(...libraryCache.content.map((c) => {
-    const box = el("input", { type: "checkbox", value: c.tag });
-    box.checked = selected.includes(c.tag);
-    const program = c.tag.includes("/");
-    return el("label", { class: "switch" + (program ? " program" : "") }, box,
-      program ? ` ↳ ${c.label.split(" › ").pop()}` : ` ${c.label}`);
-  }));
-}
-
-function pickedContent() {
-  return [...$("ch-content").querySelectorAll("input:checked")].map((i) => i.value);
-}
-
-function nameInput(item, label) {
-  const input = el("input", { type: "text", maxlength: "30", value: item.label, "aria-label": label });
-  input.addEventListener("input", () => { item.label = input.value; });
-  return input;
-}
-
-function renderPautas() {
-  $("ch-pautas").replaceChildren(...editor.pautas.map((pa, i) => el("li", {},
-    el("span", { class: "swatch" }, "📺"), nameInput(pa, "Nombre de la pauta"),
-    el("button", { class: "btn small danger", type: "button", "aria-label": `Quitar ${pa.label}`,
-      onclick: () => { editor.pautas.splice(i, 1); renderPautas(); } }, "✕"))));
-}
-
-function addPauta() {
-  const label = $("ch-pauta-new").value.trim();
-  if (!label) return;
-  editor.pautas.push({ label });
-  $("ch-pauta-new").value = "";
-  renderPautas();
-}
-
-async function saveChannel() {
-  const named = (x) => (x.tag ? { tag: x.tag, label: x.label } : x.label);
-  const body = { long_name: $("ch-name").value, number: Number($("ch-number").value) };
-  const mode = document.querySelector('input[name="ch-mode"]:checked').value;
-  const tags = pickedContent();
-  $("ch-msg").textContent = "";
-  try {
-    if (editor.channel) {
-      body.parental = $("ch-parental").checked;
-      if (editor.channel.kind === "allday") {
-        body.allday = { tags, mode };
-      } else {
-        body.pautas = editor.pautas.map(named);
-        body.ads = {
-          enabled: $("ch-ads-on").checked,
-          strategy: $("ch-ads-strategy").value,
-          duration: Number($("ch-ads-duration").value),
-        };
-      }
-      body.logo = { show: $("ch-logo-show").checked, permanent: $("ch-logo-permanent").checked };
-      await api(`/api/channels/${encodeURIComponent(editor.channel.name)}`, { method: "PUT", json: body });
-      toast("Canal guardado");
-    } else {
-      Object.assign(body, { kind: editorKind(), tags, mode });
-      await api("/api/channels", { json: body });
-      toast("Canal creado. La tele se reinicia en unos segundos.");
-    }
-    $("ch-editor").hidden = true;
-    openMoreTab();
-  } catch (e) { $("ch-msg").textContent = e.message; }
-}
-
-async function deleteChannel() {
-  const c = editor.channel;
-  if (!confirm(`¿Borrar el canal ${c.number} · ${c.long_name}?\n\nSus videos NO se borran del disco.`)) return;
-  try {
-    await api(`/api/channels/${encodeURIComponent(c.name)}`, { method: "DELETE" });
-    toast("Canal borrado");
-    $("ch-editor").hidden = true;
-    openMoreTab();
-  } catch (e) { $("ch-msg").textContent = e.message; }
-}
-
-function refreshLogoPreview(name) {
-  $("ch-logo-img").src = `/api/channels/${encodeURIComponent(name)}/logo?t=${Date.now()}`;
-}
-
-async function uploadLogo(file) {
-  if (!file || !editor.channel) return;
-  const form = new FormData();
-  form.append("file", file);
-  try {
-    const resp = await fetch(`/api/channels/${encodeURIComponent(editor.channel.name)}/logo`,
-      { method: "POST", body: form, credentials: "same-origin" });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.detail || `Error ${resp.status}`);
-    toast("Logo guardado. La tele lo muestra en unos segundos.");
-    $("ch-logo-reset").hidden = false;
-    refreshLogoPreview(editor.channel.name);
-  } catch (e) { $("ch-msg").textContent = e.message; }
-}
-
-async function resetLogo() {
-  if (!editor.channel) return;
-  try {
-    await api(`/api/channels/${encodeURIComponent(editor.channel.name)}/logo`, { method: "DELETE" });
-    toast("Ahora usa el logo de T-Rex Bites");
-    $("ch-logo-reset").hidden = true;
-    refreshLogoPreview(editor.channel.name);
-  } catch (e) { $("ch-msg").textContent = e.message; }
 }
 
 // ---------- history ----------
@@ -325,16 +134,6 @@ async function renderHistory() {
 
 function wireManagement() {
   $("bt-save").addEventListener("click", saveBedtime);
-  $("ch-new").addEventListener("click", () => openEditor(null));
-  $("ch-cancel").addEventListener("click", () => { $("ch-editor").hidden = true; });
-  $("ch-save").addEventListener("click", saveChannel);
-  $("ch-delete").addEventListener("click", deleteChannel);
-  $("ch-pauta-add").addEventListener("click", addPauta);
-  $("ch-pauta-new").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addPauta(); } });
-  document.querySelectorAll('input[name="ch-type"]').forEach((r) => r.addEventListener("change", () => renderContent(pickedContent())));
-  $("ch-ads-on").addEventListener("change", (e) => { $("ch-ads-opts").hidden = !e.target.checked; });
-  $("ch-logo-file").addEventListener("change", (e) => { uploadLogo(e.target.files[0]); e.target.value = ""; });
-  $("ch-logo-reset").addEventListener("click", resetLogo);
 }
 
 wireManagement();

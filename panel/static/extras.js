@@ -181,16 +181,16 @@ function showUsbJob(job) {
     usbState.timer = null;
     const errs = job.errors.length ? ` (${job.errors.length} con error)` : "";
     $("usb-status").textContent = `✅ Listo: ${job.done} videos copiados${errs}. Ya puedes expulsar el pendrive.`;
-    loadChannels().catch(() => {});
+    refreshAfterChange().catch(() => {});
   }
 }
 
 async function usbImport() {
   const files = [...$("usb-files").querySelectorAll("input:checked")].map((i) => i.value);
   if (!files.length) { toast("Elige al menos un video"); return; }
-  const dest = $("up-dest").value;
-  if (!dest) { toast("Primero elige arriba dónde guardarlos"); $("up-dest").focus(); return; }
-  const { channel, tag } = parseDest(dest);
+  const target = currentUploadTarget();
+  if (!target) { toast("Primero abre la carpeta de la biblioteca donde quieres copiarlos"); return; }
+  const { channel, tag } = target;
   try {
     const r = await api("/api/usb/import", { json: { device: usbState.device, files, channel, tag } });
     usbState.timer = 1;

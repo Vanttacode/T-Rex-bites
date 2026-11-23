@@ -153,3 +153,11 @@ menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 8
 .brush.program { padding-left: 22px; font-size: 13px; }
 .inspector .checks label.program { padding-left: 18px; font-size: 13px; }
 .inspector fieldset label { margin-top: 8px; }
+
+/* embedded in the panel's channel page */
+body.embed { min-width: 900px; background: transparent; }
+body.embed .brand, body.embed .top h1, body.embed .channel-pick { display: none; }
+body.embed .top { padding: 8px 12px; border-bottom-width: 1px; background: #1b1e40; }
+body.embed .tools { margin-left: 0; width: 100%; }
+body.embed #save { margin-left: auto; }
+body.embed .layout { grid-template-columns: 180px 1fr 270px; }

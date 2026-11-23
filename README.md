@@ -98,13 +98,14 @@ El PIN de fábrica es **1234** y el panel te pide cambiarlo la primera vez.
 Para tenerlo como app en el teléfono, en el navegador usa
 **"Agregar a pantalla de inicio"**.
 
-| Pestaña | Para qué |
+El panel tiene **4 secciones**: en el teléfono están abajo y en el computador en un menú lateral.
+
+| Sección | Para qué |
 |---|---|
-| 🎮 **Control** | Control remoto: canal, volumen, guía y botones directos a cada canal |
-| 📤 **Subir** | Subir videos a un canal y categoría (con barra de progreso) |
-| 📚 **Programas** | Ver y borrar los videos de cada canal |
-| 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y acceso al editor de programación |
-| ☰ **Más** | **WiFi**, **canales** (categorías y programas, **comerciales**, pautas, **logo**, PIN), **opciones de la tele**, **canal guía**, **respaldo**, **actualizaciones**, **qué se vio**, PIN y opciones avanzadas |
+| 🎮 **Control** | Control remoto: canal, volumen, guía y botones con el logo de cada canal |
+| 📚 **Biblioteca** | Todos los videos en **categorías y programas**. Creas carpetas con **＋**, arrastras videos a una carpeta para subirlos, eliges varios para moverlos o borrarlos, e importas desde un pendrive |
+| 📺 **Canales** | Una página por canal con 4 pestañas: **Programación** (qué pasa, o la línea de tiempo por hora), **Comerciales** (tandas, pautas y sus videos), **Apariencia** (logo, cortinillas y videos fijos) y **Ajustes** (nombre, número, PIN, duplicar, borrar). **＋ Nuevo canal** te guía en 3 pasos |
+| ⚙️ **Ajustes** | WiFi, hora de dormir, estática, conversión y volumen, canal guía, respaldo, actualizaciones, qué se vio y PIN |
 
 **Cómo se organiza (versión 0.6):**
 
@@ -126,9 +127,9 @@ Para tenerlo como app en el teléfono, en el navegador usa
 - 💾 **Importar desde pendrive** y **respaldo** de la configuración.
 - 📱 **Ver un canal en otro aparato** en `http://trexbites.local/ver`.
 
-### Editor de programación (en el computador)
+### Programación por hora (en el computador)
 
-Abre **http://trexbites.local/programacion** desde un computador en tu WiFi:
+En **Canales → un canal "Con horario" → Programación**, desde un computador:
 una **línea de tiempo semanal** (días en filas, horas en columnas) donde cada
 programa es un bloque de color.
 

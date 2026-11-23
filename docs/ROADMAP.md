@@ -55,6 +55,13 @@
 - [x] Elegir varios videos y moverlos o borrarlos juntos.
 - [x] Mudanza automática de los canales anteriores a la biblioteca.
 
+## ✅ Versión 0.7
+
+- [x] Panel ordenado en 4 secciones: Control, Biblioteca, Canales y Ajustes.
+- [x] Página por canal (Programación, Comerciales, Apariencia, Ajustes) con el editor por hora integrado.
+- [x] Subir arrastrando a la carpeta abierta; categorías y programas se crean ahí mismo.
+- [x] Nuevo canal paso a paso.
+
 ## 🔜 Después
 
 - [ ] Imagen para Raspberry Pi.

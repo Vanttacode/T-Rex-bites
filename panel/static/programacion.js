@@ -271,7 +271,7 @@ function renderPalette() {
   const ads = st.channel.ads || {};
   $("ads-info").textContent = ads.enabled
     ? `Activados: ${BREAKS[ads.strategy] || ads.strategy}, tandas de ${Math.round(ads.duration / 60 * 10) / 10} min. Cada bloque puede usar otro estilo.`
-    : "Apagados. Se activan en el panel: Más → Canales → Editar.";
+    : "Apagados. Se activan en la pestaña Comerciales del canal.";
 }
 
 function renderInspector() {
@@ -660,7 +660,7 @@ async function loadChannels(selectName) {
   sel.replaceChildren(...scheduled.map((c) => el("option", { value: c.name }, `${c.number} · ${c.long_name}`)));
   if (!scheduled.length) {
     $("layout").hidden = true;
-    toast("No hay canales con horario. Crea uno en el panel: Más → Canales → Nuevo → Con horario.");
+    toast("No hay canales con horario. Crea uno en el panel: Canales → Nuevo canal → Con horario.");
     return;
   }
   const name = selectName && scheduled.some((c) => c.name === selectName) ? selectName
@@ -687,12 +687,16 @@ function showLogin() {
   $("login-pin").focus();
 }
 
+const params = new URLSearchParams(location.search);
+// inside a channel's page in the panel: one channel, no own header
+if (params.get("embed")) document.body.classList.add("embed");
+
 async function start() {
   try {
     const s = await api("/api/session");
     if (!s.logged_in) { showLogin(); return; }
     $("login").hidden = true;
-    await loadChannels();
+    await loadChannels(params.get("canal") || undefined);
   } catch (e) {
     toast(e.message);
   }

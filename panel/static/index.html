@@ -44,7 +44,7 @@
       </div>
       <span class="onair" id="onair-desk" hidden>● EN EL AIRE</span>
     </header>
-    <!-- Control -->
+
     <section id="tab-remote" class="tab">
       <div class="cols">
       <div class="col">
@@ -73,46 +73,23 @@
       </div>
     </section>
 
-    <!-- Upload -->
-    <section id="tab-upload" class="tab" hidden>
-      <div class="cols">
-      <div class="col">
-      <div class="card">
-        <h2>Subir programas</h2>
-        <label class="field">¿Dónde lo guardo?
-          <select id="up-dest"></select>
-        </label>
-        <p class="muted small">Los programas van a la <b>biblioteca</b> (todos los canales la comparten). Comerciales, cortinillas y videos fijos van a su canal.</p>
-        <details class="field" id="up-when-box">
-          <summary>🕒 ¿Cuándo puede salir? <small id="up-when-sum">Siempre</small></summary>
-          <p class="muted small">Ideal para comerciales: el de cereales solo en la mañana, el de juguetes en diciembre.</p>
-          <div class="time-grid">
-            <label>Momento del día<select id="up-when-part"></select></label>
-            <label>Día<select id="up-when-day"></select></label>
-            <label>Mes<select id="up-when-month"></select></label>
-          </div>
-        </details>
-        <label class="dropzone" id="dropzone">
-          <input type="file" id="up-files" accept="video/*,.mkv,.avi,.mpg,.ts" multiple>
-          <span id="up-drop-label">📼 Toca aquí o arrastra videos</span>
-        </label>
-        <p class="muted" id="disk-info"></p>
+    <!-- Library: every video, by category and program -->
+    <section id="tab-library" class="tab" hidden>
+      <div class="card lib-head">
+        <div class="lib-tools"><input type="search" id="lib-search" placeholder="🔎 Buscar un video"></div>
+        <button class="btn small ghost" id="lib-usb">💾 Pendrive</button>
       </div>
-      </div>
-      <div class="col">
-      <ul class="uploads" id="upload-list"></ul>
-
-      <div class="card" id="usb-card">
+      <div class="card" id="usb-card" hidden>
         <div class="card-head">
           <h2>💾 Importar desde pendrive</h2>
           <button class="btn small ghost" id="usb-refresh">Buscar</button>
         </div>
-        <p class="muted small">Conecta el pendrive al computador de la tele y toca "Buscar". Se copia directo, sin pasar por el teléfono.</p>
+        <p class="muted small">Conecta el pendrive al computador de la tele y toca "Buscar". Los videos se copian a la carpeta que tengas abierta, sin pasar por el teléfono.</p>
         <div id="usb-drives"></div>
         <div id="usb-browser" hidden>
           <label class="switch"><input type="checkbox" id="usb-all"> Elegir todos</label>
           <div id="usb-files" class="usb-files"></div>
-          <p class="muted small">Se copian a donde elegiste arriba ("¿Dónde lo guardo?").</p>
+          <p class="muted small" id="usb-dest"></p>
           <div class="btn-row">
             <button class="btn" id="usb-import">Copiar a la tele</button>
             <button class="btn ghost" id="usb-eject">Expulsar</button>
@@ -120,83 +97,62 @@
         </div>
         <p class="power-line" id="usb-status"></p>
       </div>
-      </div>
-      </div>
-    </section>
-
-    <!-- Library -->
-    <section id="tab-library" class="tab" hidden>
-      <div class="card lib-head">
-        <div class="card-head">
-          <h2>📚 Biblioteca</h2>
-          <button class="btn small ghost" id="lib-organize">✏️ Categorías y programas</button>
-        </div>
-        <p class="muted small">Todos los videos de la tele, ordenados en categorías y programas. Cada canal elige qué pasar de aquí.</p>
-        <div class="lib-tools">
-          <input type="search" id="lib-search" placeholder="🔎 Buscar un video">
-        </div>
-      </div>
-      <div class="card" id="lib-editor" hidden>
-        <h2>✏️ Categorías y programas</h2>
-        <p class="muted small">Ej: <b>Videos musicales</b> → <b>Oliver Tree</b>. Un canal puede pasar toda una categoría o un solo programa.</p>
-        <ul class="cat-list" id="lib-cats"></ul>
-        <div class="add-cat">
-          <input type="text" id="lib-cat-new" maxlength="30" placeholder="Nueva categoría (ej: Cuentos)">
-          <button class="btn small ghost" id="lib-cat-add" type="button">Agregar</button>
-        </div>
-        <div class="btn-row">
-          <button class="btn" id="lib-save">Guardar</button>
-          <button class="btn ghost" id="lib-cancel">Cancelar</button>
-        </div>
-        <p class="error" id="lib-msg" role="status"></p>
-      </div>
       <div id="library"></div>
-      <div class="selbar" id="selbar" hidden>
-        <span id="sel-count">0 elegidos</span>
-        <select id="sel-dest" aria-label="Mover a"></select>
-        <button class="btn small" id="sel-move">Mover</button>
-        <button class="btn small danger" id="sel-delete">🗑</button>
-        <button class="btn small ghost" id="sel-clear" aria-label="Quitar selección">✕</button>
-      </div>
     </section>
 
-    <!-- Schedule + bedtime -->
-    <section id="tab-schedule" class="tab" hidden>
-      <div class="cols">
-      <div class="col">
-      <div class="card" id="bedtime-card">
-        <h2>🌙 Hora de dormir</h2>
-        <p class="power-line" id="power-line">…</p>
-        <div class="btn-row" id="power-buttons"></div>
-        <details id="bedtime-details">
-          <summary>Configurar horario de dormir</summary>
-          <label class="switch"><input type="checkbox" id="bt-enabled"> Apagar la tele automáticamente</label>
-          <div class="time-grid">
-            <label>Se duerme <small>dom a jue</small><input type="time" id="bt-sleep_school"></label>
-            <label>Se duerme <small>vie y sáb</small><input type="time" id="bt-sleep_weekend"></label>
-            <label>Despierta <small>lun a vie</small><input type="time" id="bt-wake_school"></label>
-            <label>Despierta <small>sáb y dom</small><input type="time" id="bt-wake_weekend"></label>
+    <!-- Channels: one page per channel -->
+    <section id="tab-channels" class="tab" hidden>
+      <div id="ch-list-view">
+        <div class="channel-cards" id="ch-cards"></div>
+      </div>
+
+      <div id="ch-page" hidden>
+        <div class="ch-page-head">
+          <button class="btn small ghost" id="ch-back">← Canales</button>
+          <img id="ch-page-logo" alt="" class="ch-page-logo">
+          <div class="grow"><h2 id="ch-page-title"></h2><p class="muted small" id="ch-page-sub"></p></div>
+        </div>
+        <nav class="subtabs" id="ch-subtabs">
+          <button data-sub="prog" class="active">🗓 Programación</button>
+          <button data-sub="ads">📺 Comerciales</button>
+          <button data-sub="look">🎨 Apariencia</button>
+          <button data-sub="conf">⚙️ Ajustes</button>
+        </nav>
+        <div class="subpage" id="sub-prog"></div>
+        <div class="subpage" id="sub-ads" hidden></div>
+        <div class="subpage" id="sub-look" hidden></div>
+        <div class="subpage" id="sub-conf" hidden></div>
+      </div>
+
+      <div class="card wizard" id="wizard" hidden>
+        <div class="card-head"><h2>＋ Nuevo canal</h2><button class="btn small ghost" id="wz-cancel">Cancelar</button></div>
+        <ol class="steps" id="wz-steps"><li class="on">Nombre</li><li>Tipo</li><li>Qué pasa</li></ol>
+        <div class="wz-step" id="wz-1">
+          <label class="field">¿Cómo se llama? <input type="text" id="wz-name" maxlength="30" placeholder="Ej: Oliver TV"></label>
+          <label class="field">Número de canal <input type="number" id="wz-number" min="1" max="99" inputmode="numeric"></label>
+        </div>
+        <div class="wz-step" id="wz-2" hidden>
+          <button class="choice" data-kind="allday" type="button"><b>🔁 Todo el día</b><span>Pasa lo que elijas, un video tras otro, a cualquier hora. Ej: un canal solo de Oliver Tree.</span></button>
+          <button class="choice" data-kind="schedule" type="button"><b>🗓 Con horario</b><span>Bloques por hora y día, como un canal de verdad: dibujos en la mañana, películas en la tarde, cierre en la noche.</span></button>
+        </div>
+        <div class="wz-step" id="wz-3" hidden>
+          <p id="wz-3-title"><b>¿Qué pasa este canal?</b></p>
+          <div class="checks" id="wz-content"></div>
+          <div id="wz-mode">
+            <label class="radio"><input type="radio" name="wz-mode" value="random" checked> 🎲 Al azar</label>
+            <label class="radio"><input type="radio" name="wz-mode" value="order"> 🔁 En orden <small>(capítulos 01, 02, 03…; elige un solo programa)</small></label>
           </div>
-          <button class="btn" id="bt-save">Guardar hora de dormir</button>
-          <p class="error" id="bt-msg" role="status"></p>
-        </details>
-      </div>
-      </div>
-      <div class="col">
-
-      <div class="card">
-        <h2>🗓 Programación</h2>
-        <p class="muted">La programación de los canales se arma en el <b>computador</b>, con una línea de tiempo por semana: bloques, capítulos en orden, mezclas al azar, comerciales y más.</p>
-        <p class="muted small">Desde un computador en tu WiFi, abre:</p>
-        <p class="power-line"><b id="editor-url">http://trexbites.local/programacion</b></p>
-        <a class="btn" href="/programacion">Abrir el editor aquí</a>
-      </div>
-      </div>
+        </div>
+        <p class="error" id="wz-msg" role="status"></p>
+        <div class="btn-row">
+          <button class="btn ghost" id="wz-prev" hidden>← Atrás</button>
+          <button class="btn" id="wz-next">Siguiente →</button>
+        </div>
       </div>
     </section>
 
-    <!-- More -->
-    <section id="tab-more" class="tab masonry" hidden>
+    <!-- Settings: the TV in general -->
+    <section id="tab-settings" class="tab masonry" hidden>
       <div class="card" id="wifi-card">
         <div class="card-head">
           <h2>📶 WiFi</h2>
@@ -217,86 +173,23 @@
         <button class="btn small ghost" id="wifi-other">Otra red (oculta)</button>
         <div class="warning" id="wifi-after" hidden></div>
       </div>
-
-      <div class="card">
-        <div class="card-head">
-          <h2>📺 Canales</h2>
-          <button class="btn small" id="ch-new">＋ Nuevo</button>
-        </div>
-        <div id="ch-list"></div>
+      <div class="card" id="bedtime-card">
+        <h2>🌙 Hora de dormir</h2>
+        <p class="power-line" id="power-line">…</p>
+        <div class="btn-row" id="power-buttons"></div>
+        <details id="bedtime-details">
+          <summary>Configurar horario de dormir</summary>
+          <label class="switch"><input type="checkbox" id="bt-enabled"> Apagar la tele automáticamente</label>
+          <div class="time-grid">
+            <label>Se duerme <small>dom a jue</small><input type="time" id="bt-sleep_school"></label>
+            <label>Se duerme <small>vie y sáb</small><input type="time" id="bt-sleep_weekend"></label>
+            <label>Despierta <small>lun a vie</small><input type="time" id="bt-wake_school"></label>
+            <label>Despierta <small>sáb y dom</small><input type="time" id="bt-wake_weekend"></label>
+          </div>
+          <button class="btn" id="bt-save">Guardar hora de dormir</button>
+          <p class="error" id="bt-msg" role="status"></p>
+        </details>
       </div>
-
-      <div class="card" id="ch-editor" hidden>
-        <h2 id="ch-editor-title">Nuevo canal</h2>
-        <label class="field">Nombre <input type="text" id="ch-name" maxlength="30" placeholder="Ej: Canal Películas"></label>
-        <label class="field">Número <input type="number" id="ch-number" min="1" max="99" inputmode="numeric"></label>
-        <fieldset class="field" id="ch-type-field">
-          <legend>Tipo</legend>
-          <label class="radio"><input type="radio" name="ch-type" value="allday" checked> 🔁 Todo el día <small>(pasa lo que elijas, un video tras otro)</small></label>
-          <label class="radio"><input type="radio" name="ch-type" value="schedule"> 🗓 Con horario <small>(bloques por hora en el editor de programación)</small></label>
-        </fieldset>
-        <div class="field" id="ch-content-field">
-          <span id="ch-content-title">¿Qué pasa este canal?</span>
-          <div class="checks" id="ch-content"></div>
-          <div id="ch-mode-field">
-            <label class="radio"><input type="radio" name="ch-mode" value="random" checked> 🎲 Al azar</label>
-            <label class="radio"><input type="radio" name="ch-mode" value="order"> 🔁 En orden <small>(capítulos 01, 02, 03…; con un solo programa)</small></label>
-          </div>
-          <p class="muted small" id="ch-content-note">Las categorías y programas se crean en <b>Programas → ✏️ Categorías y programas</b>.</p>
-        </div>
-        <div class="field" id="ch-ads-field" hidden>
-          <label class="switch"><input type="checkbox" id="ch-ads-on"> 📺 Pasar comerciales</label>
-          <div id="ch-ads-opts">
-            <label class="field">Cuándo
-              <select id="ch-ads-strategy">
-                <option value="end">Al final de cada programa</option>
-                <option value="standard">Repartidos durante el programa</option>
-                <option value="center">Una tanda a la mitad del programa</option>
-              </select>
-            </label>
-            <label class="field">Duración de cada tanda
-              <select id="ch-ads-duration">
-                <option value="30">30 segundos</option>
-                <option value="60">1 minuto</option>
-                <option value="120">2 minutos</option>
-                <option value="180">3 minutos</option>
-                <option value="300">5 minutos</option>
-              </select>
-            </label>
-            <p class="muted small">Los comerciales se suben en <b>Subir</b>, eligiendo "📺 Comerciales".</p>
-            <div class="field">
-              Pautas <small class="muted">(tandas propias para algunos bloques, ej: "Juguetes" para la tarde)</small>
-              <ul class="cat-list" id="ch-pautas"></ul>
-              <div class="add-cat">
-                <input type="text" id="ch-pauta-new" maxlength="30" placeholder="Nueva pauta (ej: Juguetes)">
-                <button class="btn small ghost" id="ch-pauta-add" type="button">Agregar</button>
-              </div>
-              <p class="muted small">En el editor de programación eliges qué pauta usa cada bloque.</p>
-            </div>
-          </div>
-        </div>
-        <div class="field" id="ch-logo-field" hidden>
-          Logo del canal (esquina de la pantalla)
-          <div class="logo-row">
-            <img id="ch-logo-img" alt="Logo del canal">
-            <div class="logo-actions">
-              <label class="btn small ghost">Cambiar logo<input type="file" id="ch-logo-file" accept="image/png,image/jpeg,image/gif" hidden></label>
-              <button class="btn small ghost" id="ch-logo-reset" type="button">Usar logo T-Rex</button>
-            </div>
-          </div>
-          <label class="switch"><input type="checkbox" id="ch-logo-show"> Mostrar logo en pantalla</label>
-          <label class="switch"><input type="checkbox" id="ch-logo-permanent"> Siempre visible (si no, aparece unos segundos)</label>
-        </div>
-        <label class="switch" id="ch-parental-field" hidden><input type="checkbox" id="ch-parental"> 🔒 Pedir PIN para ver este canal <small>(se configura en "Opciones de la tele")</small></label>
-        <p class="muted small" id="ch-new-note" hidden>Después de crear el canal podrás ponerle logo y comerciales.</p>
-        <div class="btn-row">
-          <button class="btn" id="ch-save">Guardar canal</button>
-          <button class="btn ghost" id="ch-cancel">Cancelar</button>
-        </div>
-        <button class="btn danger wide" id="ch-delete" hidden>Borrar este canal</button>
-        <p class="error" id="ch-msg" role="status"></p>
-      </div>
-
       <div class="card" id="tv-card">
         <h2>📺 Opciones de la tele</h2>
         <label class="field">Al cambiar de canal
@@ -311,7 +204,6 @@
         <button class="btn" id="tv-save">Guardar opciones</button>
         <p class="error" id="tv-msg" role="status"></p>
       </div>
-
       <div class="card" id="guide-card">
         <h2>🗒 Canal guía</h2>
         <p class="muted small">Un canal con la grilla de lo que pasa cada canal ahora y después, como el cable de los 2000.</p>
@@ -325,7 +217,6 @@
         <button class="btn" id="guide-save">Guardar guía</button>
         <p class="error" id="guide-msg" role="status"></p>
       </div>
-
       <div class="card">
         <h2>💾 Respaldo</h2>
         <p class="muted small">Guarda canales, programación, comerciales, logos y horarios en un archivo. Los videos no van incluidos.</p>
@@ -335,13 +226,11 @@
         </div>
         <p class="error" id="backup-msg" role="status"></p>
       </div>
-
       <div class="card">
         <h2>📊 Qué se vio</h2>
         <p class="muted small">Lo que pasó la tele cada día (minutos en pantalla).</p>
         <div id="history"></div>
       </div>
-
       <div class="card" id="update-card">
         <h2>🔄 Actualizaciones</h2>
         <p class="power-line" id="upd-status">…</p>
@@ -351,7 +240,6 @@
         </div>
         <p class="error" id="upd-error" role="alert"></p>
       </div>
-
       <div class="card" id="pin-card">
         <h2>🔒 Cambiar PIN</h2>
         <p class="warning" id="pin-default-warning" hidden>Todavía usas el PIN de fábrica (1234). Cámbialo para que nadie más pueda cambiar la programación.</p>
@@ -373,19 +261,32 @@
     <nav class="tabbar">
       <div class="side-brand"><img src="/static/icon.svg" alt=""><div><b>T-Rex Bites</b><small>Panel de la tele</small></div></div>
       <button data-tab="remote" class="active">🎮<span>Control</span></button>
-      <button data-tab="upload">📤<span>Subir</span></button>
-      <button data-tab="library">📚<span>Programas</span></button>
-      <button data-tab="schedule">🗓<span>Horarios</span></button>
-      <button data-tab="more">☰<span>Más</span></button>
+      <button data-tab="library">📚<span>Biblioteca</span></button>
+      <button data-tab="channels">📺<span>Canales</span></button>
+      <button data-tab="settings">⚙️<span>Ajustes</span></button>
       <div class="side-links">
-        <a href="/programacion">🗓 Editor de programación</a>
         <a href="/ver" target="_blank" rel="noopener">📱 Ver un canal aquí</a>
       </div>
     </nav>
   </main>
 
+  <div class="uploads-dock" id="uploads-dock" hidden>
+    <div class="card-head"><b id="uploads-title">Subiendo</b><button class="btn small ghost" id="uploads-close" aria-label="Cerrar">✕</button></div>
+    <ul class="uploads" id="upload-list"></ul>
+  </div>
+  <input type="file" id="file-picker" accept="video/*,.mkv,.avi,.mpg,.ts" multiple hidden>
+  <div class="selbar" id="selbar" hidden>
+    <span id="sel-count">0 elegidos</span>
+    <select id="sel-dest" aria-label="Mover a"></select>
+    <button class="btn small" id="sel-move">Mover</button>
+    <button class="btn small danger" id="sel-delete">🗑</button>
+    <button class="btn small ghost" id="sel-clear" aria-label="Quitar selección">✕</button>
+  </div>
+
   <div class="toast" id="toast" role="status" hidden></div>
   <script src="/static/app.js"></script>
+  <script src="/static/library.js"></script>
+  <script src="/static/channels.js"></script>
   <script src="/static/manage.js"></script>
   <script src="/static/wifi.js"></script>
   <script src="/static/updates.js"></script>
