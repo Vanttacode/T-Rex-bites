@@ -85,13 +85,42 @@ else
         [ -f "$f" ] || continue
         sed -i -E '/^Components:/ { / non-free-firmware/! s/$/ non-free-firmware/ }' "$f"
     done
+    # a TV installed from the USB without internet still lists the USB ("cdrom")
+    # as a package source: apt fails on it once the USB is gone
+    for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+        [ -f "$f" ] && sed -i -E 's|^(deb(-src)? +cdrom:)|# \1|' "$f"
+    done
+    if ! grep -qsE '^deb ' /etc/apt/sources.list /etc/apt/sources.list.d/*.list \
+        && ! ls /etc/apt/sources.list.d/*.sources >/dev/null 2>&1; then
+        cat > /etc/apt/sources.list <<'SOURCES'
+deb http://deb.debian.org/debian trixie main non-free-firmware
+deb http://deb.debian.org/debian trixie-updates main non-free-firmware
+deb http://security.debian.org/debian-security trixie-security main non-free-firmware
+SOURCES
+    fi
     APT=(apt-get)
-    "${APT[@]}" update
+    # one broken source must not stop an update: what's already installed keeps working
+    "${APT[@]}" update || echo "(aviso) apt-get update tuvo errores, sigo con lo que hay"
     mapfile -t -O "${#PACKAGES[@]}" PACKAGES < <(read_list packages-build.txt)
 fi
 
 step "Instalando paquetes del sistema"
-"${APT[@]}" install -y --no-install-recommends "${PACKAGES[@]}"
+if ! "${APT[@]}" install -y --no-install-recommends "${PACKAGES[@]}"; then
+    # install them one by one, so one missing package doesn't block the rest
+    echo "(aviso) instalación en bloque falló; pruebo paquete por paquete"
+    "${APT[@]}" -f install -y || true
+    missing=()
+    for pkg in "${PACKAGES[@]}"; do
+        "${APT[@]}" install -y --no-install-recommends "$pkg" || missing+=("$pkg")
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then
+        echo "(aviso) no se pudieron instalar: ${missing[*]}"
+        # without these the TV can't work at all
+        for pkg in python3 python3-venv mpv ffmpeg; do
+            dpkg -s "$pkg" >/dev/null 2>&1 || { echo "ERROR: falta $pkg" >&2; exit 1; }
+        done
+    fi
+fi
 
 # hardware support: install whatever exists, skip the rest
 for pkg in "${OPTIONAL_PACKAGES[@]}"; do
@@ -111,18 +140,23 @@ mkdir -p "$PREFIX" "$MEDIA_DIR/catalog" "$MEDIA_DIR/.uploads" "$STATE_DIR"
 chown "$TV_USER:$TV_USER" "$PREFIX" "$MEDIA_DIR" "$MEDIA_DIR/catalog" "$MEDIA_DIR/.uploads" "$STATE_DIR"
 
 # ---------------------------------------------------------------------------
-if [ "$OFFLINE" = 1 ]; then
+FS42_MARK="$FS42_DIR/.trexbites-commit"
+as_tv mkdir -p "$FS42_DIR"
+if [ "$(cat "$FS42_MARK" 2>/dev/null)" = "$FS42_COMMIT" ]; then
+    step "FieldStation42 (motor de la tele) ya está en la versión $FS42_COMMIT"
+elif [ "$OFFLINE" = 1 ]; then
     step "Copiando FieldStation42 (motor de la tele) desde el USB"
-    as_tv mkdir -p "$FS42_DIR"
-    # an update never touches confs/ or runtime/: those hold the person's settings
+    # confs/ and runtime/ hold the person's settings: never overwritten
     as_tv tar -xzf "$OFFLINE_DIR/fieldstation42.tar.gz" -C "$FS42_DIR" --exclude=./confs --exclude=./runtime
+    echo "$FS42_COMMIT" | as_tv tee "$FS42_MARK" >/dev/null
 else
     step "Descargando FieldStation42 (motor de la tele) en la versión $FS42_COMMIT"
-    if [ ! -d "$FS42_DIR/.git" ]; then
-        as_tv git clone "$FS42_REPO" "$FS42_DIR"
-    fi
-    as_tv git -C "$FS42_DIR" fetch --quiet origin
-    as_tv git -C "$FS42_DIR" -c advice.detachedHead=false checkout --quiet "$FS42_COMMIT"
+    FS42_TGZ=$(mktemp)
+    curl -fsSL --retry 4 "${FS42_REPO%.git}/archive/$FS42_COMMIT.tar.gz" -o "$FS42_TGZ"
+    as_tv tar -xzf "$FS42_TGZ" -C "$FS42_DIR" --strip-components=1 \
+        --exclude='*/confs' --exclude='*/runtime'
+    rm -f "$FS42_TGZ"
+    echo "$FS42_COMMIT" | as_tv tee "$FS42_MARK" >/dev/null
 fi
 
 # videos live on /srv so the engine can be reinstalled without touching them
@@ -138,9 +172,20 @@ for conf in "$FS42_DIR"/confs/*.json; do
         has_channels=1
     fi
 done
+LIBRARY_DIR=$MEDIA_DIR/catalog/biblioteca
+as_tv mkdir -p "$LIBRARY_DIR"
 if [ "$has_channels" = 0 ]; then
     install -o "$TV_USER" -g "$TV_USER" -m 644 "$SRC_DIR"/system/defaults/confs/*.json "$FS42_DIR/confs/"
+    if [ ! -f "$LIBRARY_DIR/.trexbites.json" ]; then
+        install -o "$TV_USER" -g "$TV_USER" -m 644 "$SRC_DIR/system/defaults/biblioteca.json" "$LIBRARY_DIR/.trexbites.json"
+    fi
 fi
+# channel helpers run straight from the source tree
+trex_py() { (cd "$SRC_DIR/panel" && python3 -m "$@"); }
+# channels made before the shared library (v0.5 and earlier) move into it;
+# their videos are moved on the same disk, never copied or deleted
+trex_py trexbites_panel.migrate --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR"
+chown -R "$TV_USER:$TV_USER" "$FS42_DIR/confs" "$LIBRARY_DIR"
 if [ ! -f "$FS42_DIR/confs/main_config.json" ]; then
     API_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')
     cat > "$FS42_DIR/confs/main_config.json" <<EOF
@@ -223,10 +268,11 @@ chmod 644 "$PLACEHOLDER" "$MEDIA_ASSETS/a_dormir.png" "$MEDIA_ASSETS/configurar_
 while IFS= read -r folder; do
     [ -n "$folder" ] || continue
     as_tv mkdir -p "$folder"
-    if [ -z "$(find "$folder" -maxdepth 1 -type f -print -quit)" ]; then
+    # a category whose videos are all in program subfolders is not empty
+    if [ -z "$(find "$folder" -type f ! -name '.*' -print -quit)" ]; then
         as_tv cp "$PLACEHOLDER" "$folder/_bienvenida_trexbites.mp4"
     fi
-done < <(python3 -I "$SRC_DIR/panel/trexbites_panel/channels.py" --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-dirs)
+done < <(trex_py trexbites_panel.channels --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-dirs)
 
 # scheduled channels fill the gaps between programs with short clips
 while IFS= read -r folder; do
@@ -235,7 +281,7 @@ while IFS= read -r folder; do
     if [ -z "$(find "$folder" -maxdepth 1 -type f -print -quit)" ]; then
         as_tv cp "$IDENT" "$folder/_ident_trexbites.mp4"
     fi
-done < <(python3 -I "$SRC_DIR/panel/trexbites_panel/channels.py" --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-bump-dirs)
+done < <(trex_py trexbites_panel.channels --confs "$FS42_DIR/confs" --fs42 "$FS42_DIR" --print-bump-dirs)
 
 step "Preparando la programación inicial"
 as_tv bash -c "cd '$FS42_DIR' && env/bin/python3 station_42.py --rebuild_catalog && env/bin/python3 station_42.py --add_week" \
@@ -256,12 +302,31 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+step "Instalando las actualizaciones a distancia"
+install -m 644 "$SRC_DIR/VERSION" "$PREFIX/VERSION" 2>/dev/null || echo "0.0.0" > "$PREFIX/VERSION"
+install -d "$PREFIX/bin"
+install -m 755 "$SRC_DIR/system/trexbites-update.sh" "$PREFIX/bin/trexbites-update"
+install -m 755 "$SRC_DIR/system/trexbites-alias.sh" "$PREFIX/bin/trexbites-alias"
+install -m 644 "$SRC_DIR/upstream/trexbites.conf" "$PREFIX/trexbites.conf"
+
+# ---------------------------------------------------------------------------
 step "Configurando el arranque directo a la tele"
 cp -r "$SRC_DIR/system/rootfs/." /
 install -d -o "$TV_USER" -g "$TV_USER" "$TV_HOME/.config/systemd/user"
 cp -r "$SRC_DIR/system/home/tv/." "$TV_HOME/"
 chmod +x "$TV_HOME/.xinitrc"
 chown -R "$TV_USER:$TV_USER" "$TV_HOME"
+
+# channel logos and the channel banner are drawn by FieldStation42's OSD;
+# osd/osd.json is the person's own file, so it is only written the first time
+if [ ! -f "$FS42_DIR/osd/osd.json" ]; then
+    install -o "$TV_USER" -g "$TV_USER" -m 644 "$SRC_DIR/system/defaults/osd.json" "$FS42_DIR/osd/osd.json"
+fi
+# transparent background, so only the logo shows over the video
+install -m 644 "$SRC_DIR/panel/static/logo-trexbites.png" "$PREFIX/media/logo_trexbites.png"
+install -d -o "$TV_USER" -g "$TV_USER" "$TV_HOME/.config/systemd/user/fs42.service.wants"
+ln -sfn ../fs42-osd.service "$TV_HOME/.config/systemd/user/fs42.service.wants/fs42-osd.service"
+chown -h "$TV_USER:$TV_USER" "$TV_HOME/.config/systemd/user/fs42.service.wants/fs42-osd.service"
 
 # the TV starts when the tv user's screen session starts
 install -d -o "$TV_USER" -g "$TV_USER" "$TV_HOME/.config/systemd/user/trexbites-x11.target.wants"
@@ -284,14 +349,40 @@ else
     printf '127.0.1.1\t%s\n' "$HOSTNAME_TV" >> /etc/hosts
 fi
 
-step "Arranque silencioso"
+step "Enlaces fijos al kernel"
+if ! grep -qs '^do_symlinks *= *yes' /etc/kernel-img.conf; then
+    sed -i '/^do_symlinks/d' /etc/kernel-img.conf 2>/dev/null || true
+    echo "do_symlinks = yes" >> /etc/kernel-img.conf
+fi
+LATEST_KERNEL=$(find /boot -maxdepth 1 -name 'vmlinuz-*' | sort -V | tail -n 1)
+if [ -n "$LATEST_KERNEL" ]; then
+    KVER=${LATEST_KERNEL#/boot/vmlinuz-}
+    ln -sfn "boot/vmlinuz-$KVER" /vmlinuz
+    [ -e "/boot/initrd.img-$KVER" ] && ln -sfn "boot/initrd.img-$KVER" /initrd.img
+fi
+
+step "Menú de arranque"
 if [ -f /etc/default/grub ]; then
-    sed -i -E 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub
     sed -i -E 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3"/' /etc/default/grub
+    # list other systems on the disk (a Linux or Windows installed before) in the menu
+    if grep -q '^#\?GRUB_DISABLE_OS_PROBER' /etc/default/grub; then
+        sed -i -E 's/^#?GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' /etc/default/grub
+    else
+        echo 'GRUB_DISABLE_OS_PROBER=false' >> /etc/default/grub
+    fi
+    if command -v os-prober >/dev/null && [ -n "$(os-prober 2>/dev/null)" ]; then
+        # shared computer: show the menu long enough to pick the other system
+        echo "Encontré otro sistema en el disco: queda en el menú de arranque."
+        sed -i -E 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=8/' /etc/default/grub
+        sed -i -E 's/^#?GRUB_TIMEOUT_STYLE=.*/GRUB_TIMEOUT_STYLE=menu/' /etc/default/grub
+    else
+        # T-Rex Bites alone: straight to the TV
+        sed -i -E 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub
+    fi
     update-grub || true
 fi
 
-systemctl enable avahi-daemon.service NetworkManager.service trexbites-panel.service
+systemctl enable avahi-daemon.service NetworkManager.service trexbites-panel.service trexbites-control-name.service
 systemctl enable trexbites-firstboot.service
 systemctl set-default multi-user.target
 
@@ -337,9 +428,15 @@ if [ "$OFFLINE" = 1 ]; then
 fi
 echo
 echo "=== T-Rex Bites quedó instalado $(date) ==="
-echo "Reinicia el equipo. Luego abre http://$HOSTNAME_TV.local desde tu teléfono (PIN 1234)."
+echo "Reinicia el equipo. Luego abre http://$HOSTNAME_TV.local en el computador y http://control.local en el teléfono (PIN 1234)."
 
 if [ "$LIVE_SYSTEMD" = 1 ]; then
     systemctl daemon-reload
     systemctl restart avahi-daemon.service trexbites-panel.service || true
+    systemctl restart trexbites-control-name.service || true
+    # the tv user's own services (player, logo, bedtime screen)
+    systemctl --user --machine="$TV_USER@" daemon-reload 2>/dev/null || true
+    if systemctl --user --machine="$TV_USER@" is-active --quiet fs42.service 2>/dev/null; then
+        systemctl --user --machine="$TV_USER@" restart fs42.service || true
+    fi
 fi

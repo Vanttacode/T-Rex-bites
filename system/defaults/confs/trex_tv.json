@@ -1,57 +1,70 @@
 {
   "station_conf": {
-    "network_name": "TRexTV",
+    "network_name": "T-Rex TV",
     "network_long_name": "T-Rex TV",
     "channel_number": 3,
     "network_type": "standard",
     "schedule_increment": 30,
     "commercial_free": true,
     "fallback_tag": "dibujos",
-    "bump_dir": "bumps",
-    "content_dir": "catalog/trex_tv",
+    "bump_dir": "canales/trextv/bumps",
+    "content_dir": "catalog/biblioteca",
     "sign_off_video": "runtime/signoff.mp4",
     "off_air_video": "runtime/off_air_pattern.mp4",
     "standby_image": "runtime/standby.png",
     "be_right_back_media": "runtime/brb.png",
+    "trexbites": {
+      "kind": "schedule",
+      "folder": "canales/trextv",
+      "pautas": []
+    },
     "monday": {
       "7": {
         "tags": "manana"
       },
       "8": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "9": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "10": {
         "tags": "dibujos"
       },
       "11": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "12": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "13": {
         "tags": "educativo"
       },
       "14": {
-        "tags": "educativo"
+        "tags": "educativo",
+        "continued": true
       },
       "15": {
         "tags": "dibujos"
       },
       "16": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "17": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "18": {
         "tags": "peliculas"
       },
       "19": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "20": {
         "event": "signoff"
@@ -62,40 +75,48 @@
         "tags": "manana"
       },
       "8": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "9": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "10": {
         "tags": "dibujos"
       },
       "11": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "12": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "13": {
         "tags": "educativo"
       },
       "14": {
-        "tags": "educativo"
+        "tags": "educativo",
+        "continued": true
       },
       "15": {
         "tags": "dibujos"
       },
       "16": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "17": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "18": {
         "tags": "peliculas"
       },
       "19": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "20": {
         "event": "signoff"
@@ -106,40 +127,48 @@
         "tags": "manana"
       },
       "8": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "9": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "10": {
         "tags": "dibujos"
       },
       "11": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "12": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "13": {
         "tags": "educativo"
       },
       "14": {
-        "tags": "educativo"
+        "tags": "educativo",
+        "continued": true
       },
       "15": {
         "tags": "dibujos"
       },
       "16": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "17": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "18": {
         "tags": "peliculas"
       },
       "19": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "20": {
         "event": "signoff"
@@ -150,40 +179,48 @@
         "tags": "manana"
       },
       "8": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "9": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "10": {
         "tags": "dibujos"
       },
       "11": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "12": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "13": {
         "tags": "educativo"
       },
       "14": {
-        "tags": "educativo"
+        "tags": "educativo",
+        "continued": true
       },
       "15": {
         "tags": "dibujos"
       },
       "16": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "17": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "18": {
         "tags": "peliculas"
       },
       "19": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "20": {
         "event": "signoff"
@@ -194,40 +231,48 @@
         "tags": "manana"
       },
       "8": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "9": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "10": {
         "tags": "dibujos"
       },
       "11": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "12": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "13": {
         "tags": "educativo"
       },
       "14": {
-        "tags": "educativo"
+        "tags": "educativo",
+        "continued": true
       },
       "15": {
         "tags": "dibujos"
       },
       "16": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "17": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "18": {
         "tags": "peliculas"
       },
       "19": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "20": {
         "event": "signoff"
@@ -238,31 +283,37 @@
         "tags": "manana"
       },
       "8": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "9": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "10": {
         "tags": "dibujos"
       },
       "11": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "12": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "13": {
         "tags": "educativo"
       },
       "14": {
-        "tags": "educativo"
+        "tags": "educativo",
+        "continued": true
       },
       "15": {
         "tags": "peliculas"
       },
       "16": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "17": {
         "tags": "dibujos"
@@ -271,7 +322,8 @@
         "tags": "peliculas"
       },
       "19": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "20": {
         "event": "signoff"
@@ -282,31 +334,37 @@
         "tags": "manana"
       },
       "8": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "9": {
-        "tags": "manana"
+        "tags": "manana",
+        "continued": true
       },
       "10": {
         "tags": "dibujos"
       },
       "11": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "12": {
-        "tags": "dibujos"
+        "tags": "dibujos",
+        "continued": true
       },
       "13": {
         "tags": "educativo"
       },
       "14": {
-        "tags": "educativo"
+        "tags": "educativo",
+        "continued": true
       },
       "15": {
         "tags": "peliculas"
       },
       "16": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "17": {
         "tags": "dibujos"
@@ -315,31 +373,12 @@
         "tags": "peliculas"
       },
       "19": {
-        "tags": "dibujos"
+        "tags": "peliculas",
+        "continued": true
       },
       "20": {
         "event": "signoff"
       }
-    },
-    "trexbites": {
-      "categories": [
-        {
-          "tag": "manana",
-          "label": "Mañana"
-        },
-        {
-          "tag": "dibujos",
-          "label": "Dibujos animados"
-        },
-        {
-          "tag": "educativo",
-          "label": "Educativos"
-        },
-        {
-          "tag": "peliculas",
-          "label": "Películas"
-        }
-      ]
     }
   }
 }

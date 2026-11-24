@@ -38,6 +38,8 @@ class FS42Client:
         self._dirty = set()
         self._restart_wanted = False
         self._restart_task = None
+        # optional: restart the TV services without going through FieldStation42
+        self.restart_fn = None
 
     def _api_key(self):
         # read on every call: FieldStation42 owns this file and may change the key
@@ -175,9 +177,12 @@ class FS42Client:
                 self._restart_wanted = True
                 return
             try:
-                await self.request("POST", "/manage/restart", timeout=30)
+                if self.restart_fn:
+                    await asyncio.to_thread(self.restart_fn)
+                else:
+                    await self.request("POST", "/manage/restart", timeout=30)
                 self.rebuilds["_player"] = {"status": "done", "detail": ""}
-            except FS42Error as e:
+            except (FS42Error, RuntimeError, OSError) as e:
                 log.warning("player restart failed: %s", e)
                 self.rebuilds["_player"] = {"status": "error", "detail": str(e)}
 

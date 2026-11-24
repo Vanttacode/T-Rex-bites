@@ -42,7 +42,8 @@ def env(tmp_path, monkeypatch):
     fs42 = tmp_path / "fs42"
     shutil.copytree(DEFAULT_CONFS, fs42 / "confs")
     (fs42 / "confs" / "main_config.json").write_text(json.dumps({"api_key": "k" * 20}))
-    (fs42 / "catalog").mkdir()
+    (fs42 / "catalog" / "biblioteca").mkdir(parents=True)
+    shutil.copy(REPO / "system" / "defaults" / "biblioteca.json", fs42 / "catalog" / "biblioteca" / ".trexbites.json")
     placeholder = tmp_path / "media" / "_bienvenida_trexbites.mp4"
     placeholder.parent.mkdir()
     placeholder.write_bytes(b"sample")
@@ -55,6 +56,14 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("TREXBITES_PLACEHOLDER", str(placeholder))
     monkeypatch.setenv("TREXBITES_POWER", "none")
     monkeypatch.setenv("TREXBITES_WIFI", "none")
+    monkeypatch.setenv("TREXBITES_UPDATE", "none")
+    monkeypatch.setenv("TREXBITES_USB", "none")
+    monkeypatch.setenv("TREXBITES_CONVERT", "none")
+    monkeypatch.setenv("TREXBITES_MEDIA_DIR", str(tmp_path / "srv"))
+    monkeypatch.setenv("TREXBITES_LOGO_IMAGE", str(tmp_path / "media" / "logo.png"))
+    (tmp_path / "VERSION").write_text("0.2.0-beta")
+    monkeypatch.setenv("TREXBITES_VERSION_FILE", str(tmp_path / "VERSION"))
+    monkeypatch.setenv("TREXBITES_UPDATE_STATE", str(tmp_path / "state" / "update.json"))
     monkeypatch.setenv("TREXBITES_FS42_URL", "http://127.0.0.1:9")
 
     from trexbites_panel import app as app_module

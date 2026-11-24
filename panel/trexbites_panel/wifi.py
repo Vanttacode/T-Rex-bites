@@ -7,9 +7,11 @@ Everything goes through NetworkManager's nmcli; the panel's user may manage
 connections thanks to a polkit rule installed with T-Rex Bites.
 """
 
+import json
 import logging
 import subprocess
 import time
+from pathlib import Path
 
 log = logging.getLogger("trexbites.wifi")
 
@@ -26,6 +28,12 @@ OFFLINE_GRACE = 90
 # can look for the home network again (the WiFi chip can't do both at once)
 RETRY_HOME_EVERY = 300
 CONNECT_TIMEOUT = 45
+# after the setup network fails to open (a WiFi chip that can't be an access
+# point), wait this long before trying again
+HOTSPOT_RETRY_AFTER = 300
+# the on-screen setup (setup_screen.py) marks itself busy while it scans or
+# connects; the panel leaves the WiFi card alone meanwhile
+BUSY_MAX_AGE = 120
 
 
 def split_terse(line):
@@ -60,14 +68,18 @@ def validate(ssid, password):
 
 class WifiManager:
 
-    def __init__(self, runner=subprocess.run, clock=time.monotonic):
+    def __init__(self, runner=subprocess.run, clock=time.monotonic, state_dir=None):
         self._run = runner
         self._clock = clock
+        # shared with the on-screen setup: network list and setup-network state
+        self._state_dir = Path(state_dir) if state_dir else None
+        self._hotspot_retry_at = 0.0
         self.networks = []          # last scan, kept while the setup network is on
         self.last_error = None
         self.last_connected = None  # name of the home network that worked last
         self.connecting = False
         self.needs_setup = False    # True: show the setup screen instead of the TV
+        self.hotspot_error = None   # why the setup network could not open, if it failed
         self.status_cache = {}
         self._offline_since = None
         self._hotspot_since = None
@@ -166,7 +178,10 @@ class WifiManager:
                     "ipv6.method", "ignore")
         result = self.nm("connection", "up", HOTSPOT_CON, timeout=40)
         if result.returncode != 0:
-            log.warning("could not start the setup network: %s", result.stderr.strip())
+            # usually a WiFi chip that can't act as an access point
+            self.hotspot_error = result.stderr.strip() or "nmcli connection up failed"
+            self._hotspot_retry_at = self._clock() + HOTSPOT_RETRY_AFTER
+            log.warning("could not start the setup network: %s", self.hotspot_error)
         else:
             log.info("setup network %r is on", HOTSPOT_SSID)
 
@@ -214,9 +229,34 @@ class WifiManager:
 
     # ---------- periodic check ----------
 
+    def _busy_on_screen(self):
+        if not self._state_dir:
+            return False
+        try:
+            return time.time() - float((self._state_dir / "wifi-busy").read_text()) < BUSY_MAX_AGE
+        except (OSError, ValueError):
+            return False
+
+    def _share_status(self):
+        if not self._state_dir:
+            return
+        data = {**self.status_cache, "networks": self.networks, "hotspot_error": self.hotspot_error}
+        try:
+            tmp = self._state_dir / "wifi-status.json.tmp"
+            tmp.write_text(json.dumps(data))
+            tmp.replace(self._state_dir / "wifi-status.json")
+        except OSError:
+            pass
+
     def tick(self):
         """Called every few seconds: open the setup network when the box has
         been offline for a while, close it once a network works."""
+        try:
+            self._tick()
+        finally:
+            self._share_status()
+
+    def _tick(self):
         if self.connecting:
             return
         status = self.status()
@@ -253,11 +293,14 @@ class WifiManager:
             return
 
         self._hotspot_since = None
-        self.needs_setup = False
         grace = OFFLINE_GRACE if saved else FIRST_SETUP_GRACE
+        # never configured and still offline: show the setup screen even if the
+        # setup network fails to open, so the TV never sits on a black screen
+        self.needs_setup = not saved and now - self._offline_since >= grace
+        if self._busy_on_screen() or now < self._hotspot_retry_at:
+            return
         if now - self._offline_since >= grace:
             self.start_hotspot(self.wifi_device())
             self.status_cache = self.status()
             if self.status_cache.get("hotspot"):
                 self._hotspot_since = now
-                self.needs_setup = not saved

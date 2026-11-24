@@ -6,6 +6,11 @@ xset s off
 xset s noblank
 xset -dpms
 
+# compositor: lets the channel logo be drawn transparently over the video
+if command -v picom >/dev/null; then
+    picom --backend xrender --no-fading-openclose -b
+fi
+
 systemctl --user import-environment DISPLAY XAUTHORITY
 systemctl --user start trexbites-x11.target
 

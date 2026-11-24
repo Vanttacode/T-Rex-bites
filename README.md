@@ -60,14 +60,25 @@ GitHub Actions arma el USB y lo publica en Releases automáticamente.
 
 ### 2. Instalar
 
-> ⚠️ **La instalación borra todo el disco del computador.**
+El USB ofrece dos formas de instalar:
+
+| Opción del menú | Para qué |
+|---|---|
+| **Instalar T-Rex Bites** | Computador dedicado a la tele. ⚠️ **Borra todo el disco.** |
+| **Instalar al lado de otro Linux** | Computador con Fedora, Ubuntu, etc. que quieres conservar. Usa solo el espacio sin asignar y no toca tu Linux; después un comando agrega T-Rex Bites a su menú. Ver [la guía](docs/INSTALAR-JUNTO-A-OTRO-SISTEMA.md). |
+| **Instalar al lado de Windows** | Igual, junto a Windows; el menú de T-Rex Bites lista Windows. Ver [la guía](docs/INSTALAR-JUNTO-A-OTRO-SISTEMA.md). |
+
+Pasos para un computador dedicado:
 
 1. Conecta el USB. No hace falta internet ni cable de red.
 2. Prende el computador y elige arrancar desde el USB. Según la marca, hay que
    presionar **F12**, **F9**, **F2**, **Esc** o **Novo** (Lenovo) al encenderlo.
 3. Elige **Instalar T-Rex Bites** y luego **Sí, borrar el disco e instalar**.
 4. Espera unos 15 a 30 minutos. El computador se reinicia solo y aparece la tele.
-5. **Configura el WiFi desde el teléfono** (no hace falta tocar el router):
+5. **Configura el WiFi.** La tele muestra *"Configura el WiFi de T-Rex Bites"* con tres formas:
+   - **Con el teclado del computador:** elige tu red con las flechas, escribe la clave y Enter.
+   - **Con cable de red:** se conecta solo.
+   - **Con el teléfono** (si la tarjeta WiFi del computador puede crear su propia red):
    - La tele muestra *"Configura el WiFi de T-Rex Bites"*.
    - En tu teléfono, conéctate a la red WiFi **"T-Rex Bites Config"** (sin clave).
    - Se abre sola la página de configuración (si no, entra a `http://10.42.0.1`).
@@ -87,13 +98,57 @@ El PIN de fábrica es **1234** y el panel te pide cambiarlo la primera vez.
 Para tenerlo como app en el teléfono, en el navegador usa
 **"Agregar a pantalla de inicio"**.
 
-| Pestaña | Para qué |
+**Dos direcciones:**
+
+| Dirección | Para qué |
 |---|---|
-| 🎮 **Control** | Control remoto: canal, volumen, guía y botones directos a cada canal |
-| 📤 **Subir** | Subir videos a un canal y categoría (con barra de progreso) |
-| 📚 **Programas** | Ver y borrar los videos de cada canal |
-| 🗓 **Horarios** | **Hora de dormir** (apagado automático, "apagar hasta mañana", "1 hora extra") y **grilla semanal** de cada canal: eliges un pincel (categoría, fin de transmisión o apagado) y tocas las horas |
-| ☰ **Más** | **WiFi**, crear y editar **canales** y sus categorías, **qué se vio** cada día, PIN y opciones avanzadas |
+| 📱 **http://control.local** | Solo el **control remoto**, para el teléfono: canales con su logo, volumen, guía, encender/apagar y PIN de canales. Se puede "Agregar a pantalla de inicio" como app |
+| 💻 **http://trexbites.local** | El **panel completo**, para el computador |
+
+Si algún teléfono no encuentra `control.local`, el control también está en `http://trexbites.local/control`.
+
+El panel tiene **4 secciones**: en el teléfono están abajo y en el computador en un menú lateral.
+
+| Sección | Para qué |
+|---|---|
+| 🎮 **Control** | Control remoto: canal, volumen, guía y botones con el logo de cada canal |
+| 📚 **Biblioteca** | Todos los videos en **categorías y programas**. Creas carpetas con **＋**, arrastras videos a una carpeta para subirlos, eliges varios para moverlos o borrarlos, e importas desde un pendrive |
+| 📺 **Canales** | Una página por canal con 4 pestañas: **Programación** (qué pasa, o la línea de tiempo por hora), **Comerciales** (tandas, pautas y sus videos), **Apariencia** (logo, cortinillas y videos fijos) y **Ajustes** (nombre, número, PIN, duplicar, borrar). **＋ Nuevo canal** te guía en 3 pasos |
+| ⚙️ **Ajustes** | WiFi, hora de dormir, estática, conversión y volumen, canal guía, respaldo, actualizaciones, qué se vio y PIN |
+
+**Cómo se organiza (versión 0.6):**
+
+- 📚 **Una biblioteca para toda la tele**, con categorías y programas, por ejemplo *Videos musicales → Oliver Tree* o *Dibujos animados → Bluey*. Subes un video una sola vez y lo usa cualquier canal.
+- 📺 **Dos tipos de canal**, que eligen qué pasar de la biblioteca:
+  - **🔁 Todo el día:** una o varias categorías o programas, al azar o en orden.
+  - **🗓 Con horario:** bloques por hora en el editor de programación.
+- Cada canal tiene **lo suyo**: logo, comerciales y pautas, cortinillas, videos fijos y PIN.
+- En **Programas** eliges varios videos con casillas y los **mueves o borras juntos**.
+- Al actualizar desde una versión anterior, tus videos se **mudan solos** a la biblioteca: se mueven en el mismo disco, sin copiar ni borrar nada.
+
+**Otras funciones (desde la 0.5):**
+
+- 📺 **Pautas comerciales** por bloque, y comerciales que salen solo en un **momento**: mañana, noche, un día o un mes.
+- 📌 **Videos fijos** al empezar o terminar un bloque, y 🎬 **cortinillas** propias.
+- 📡 **Estática** al cambiar de canal, y 🗒 **canal guía** estilo cable.
+- 🔒 **Canales con PIN**.
+- ⚙️ **Conversión automática** de videos pesados y 🔊 **volumen parejo**.
+- 💾 **Importar desde pendrive** y **respaldo** de la configuración.
+- 📱 **Ver un canal en otro aparato** en `http://trexbites.local/ver`.
+
+### Programación por hora (en el computador)
+
+En **Canales → un canal "Con horario" → Programación**, desde un computador:
+una **línea de tiempo semanal** (días en filas, horas en columnas) donde cada
+programa es un bloque de color.
+
+- **Crear:** eliges un contenido en la paleta y arrastras sobre la línea de tiempo.
+- **Mover / alargar:** arrastras el bloque (también a otro día) o sus bordes.
+- **Cada bloque:** una o varias categorías (🎲 mezcla al azar), 🔁 capítulos en
+  orden (sigue donde quedó), duración de los videos (cortos, episodios, películas)
+  y estilo de la tanda de comerciales.
+- **Herramientas:** copiar un día a otros, programación al azar, duplicar el canal
+  (con los mismos videos o con videos propios), deshacer/rehacer y guardar (Ctrl+S).
 
 ---
 
@@ -121,7 +176,7 @@ USB T-Rex Bites
          ├─ Arranca directo en la tele (usuario "tv", sin login)
          ├─ FieldStation42 + mpv  → la imagen en pantalla      (/opt/trexbites/fieldstation42)
          ├─ Panel web T-Rex Bites → http://trexbites.local    (/opt/trexbites/panel)
-         └─ Videos en el disco local                          (/srv/trexbites/catalog)
+         └─ Biblioteca de videos en el disco local            (/srv/trexbites/catalog/biblioteca)
 ```
 
 | Carpeta | Qué hay |
@@ -136,8 +191,8 @@ USB T-Rex Bites
 
 | Canal | Tipo | Qué pasa |
 |---|---|---|
-| **3 · T-Rex TV** | Con horario | 7–10 h *Mañana*, 10–13 h *Dibujos*, 13–15 h *Educativos*, 15–18 h *Dibujos*, 18 h *Películas*, 20 h fin de transmisión |
-| **5 · Dino Loop** | Repetición continua | Todos sus videos en loop, a cualquier hora |
+| **3 · T-Rex TV** | 🗓 Con horario | 7–10 h *Mañana*, 10–13 h *Dibujos*, 13–15 h *Educativos*, 15–18 h *Películas* y *Dibujos*, 18 h *Películas*, 20 h fin de transmisión |
+| **5 · Dino Loop** | 🔁 Todo el día | *Dibujos animados* al azar, a cualquier hora |
 
 Los horarios y canales se pueden cambiar en la consola avanzada de
 FieldStation42 (`http://trexbites.local:4242`, enlazada desde Ajustes).
@@ -165,4 +220,4 @@ TREXBITES_FS42_DIR=/tmp/fs42 TREXBITES_STATE=/tmp/fs42/panel.json uvicorn trexbi
 
 ## Estado
 
-Primera versión (base). Ver [docs/ROADMAP.md](docs/ROADMAP.md) para lo que falta.
+Versión 0.6 (beta). Ver [docs/ROADMAP.md](docs/ROADMAP.md) para lo que falta.

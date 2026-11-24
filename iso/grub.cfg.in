@@ -28,6 +28,26 @@ submenu 'Instalar T-Rex Bites' {
         initrd /install.amd/initrd.gz
     }
 }
+submenu 'Instalar al lado de otro Linux (Fedora, Ubuntu...)' {
+    set menu_color_highlight=black/yellow
+    menuentry 'No, volver' {
+        configfile /boot/grub/grub.cfg
+    }
+    menuentry 'Si, instalar T-Rex Bites SOLO en el espacio libre (tu Linux no se toca)' {
+        linux /install.amd/vmlinuz @KERNEL_ARGS_LINUX@
+        initrd /install.amd/initrd.gz
+    }
+}
+submenu 'Instalar al lado de Windows (usa el espacio libre)' {
+    set menu_color_highlight=black/yellow
+    menuentry 'No, volver' {
+        configfile /boot/grub/grub.cfg
+    }
+    menuentry 'Si, instalar T-Rex Bites SOLO en el espacio libre del disco' {
+        linux /install.amd/vmlinuz @KERNEL_ARGS_LIBRE@
+        initrd /install.amd/initrd.gz
+    }
+}
 menuentry 'Salir (arrancar normalmente desde el disco)' {
     exit
 }

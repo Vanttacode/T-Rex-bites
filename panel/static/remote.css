@@ -1,0 +1,83 @@
+:root {
+  --bg: #12142b;
+  --panel: #1f2347;
+  --panel-2: #2a2f5c;
+  --text: #f3f1e8;
+  --muted: #a9abc9;
+  --accent: #ff8a1f;
+  --danger: #ff5a5a;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body {
+  background: radial-gradient(circle at 50% -10%, #2c3170 0%, var(--bg) 55%) var(--bg) fixed;
+  color: var(--text); min-height: 100vh;
+  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  user-select: none; -webkit-user-select: none;
+}
+[hidden] { display: none !important; }
+.muted { color: var(--muted); }
+.error { color: var(--danger); min-height: 1.2em; text-align: center; }
+main, .login { max-width: 460px; margin: 0 auto; padding: 16px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+/* PIN */
+.login { text-align: center; padding-top: 40px; }
+.login-logo { width: 84px; }
+.login h1 { margin: 10px 0 4px; }
+.dots { display: flex; justify-content: center; gap: 14px; margin: 22px 0; }
+.dots span { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--muted); }
+.dots span.on { background: var(--accent); border-color: var(--accent); }
+.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.keypad button, .key {
+  border: 0; border-radius: 18px; padding: 18px 0; font-size: 1.5rem; color: var(--text);
+  background: linear-gradient(180deg, var(--panel-2), #20244b); box-shadow: 0 5px 0 #0b0c1d;
+}
+.keypad button:active, .key:active, .ch-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #0b0c1d; }
+.keypad.small button { padding: 12px 0; font-size: 1.3rem; }
+
+/* now playing */
+.now {
+  display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 20px;
+  background: var(--panel); box-shadow: inset 0 0 0 2px rgba(255,255,255,0.05);
+}
+.now-logo { width: 56px; height: 42px; object-fit: contain; flex: none; }
+.now-text { flex: 1; min-width: 0; }
+.now-ch { font-weight: bold; font-size: 1.15rem; }
+.now-ch b { color: var(--accent); }
+.now-title { color: var(--muted); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.power {
+  flex: none; width: 52px; height: 52px; border-radius: 50%; border: 0; font-size: 1.5rem;
+  background: #4a1f2a; color: #ffb3b3; box-shadow: 0 4px 0 #1d0b10;
+}
+.power.off { background: #1f4a2a; color: #b3ffc4; box-shadow: 0 4px 0 #0b1d10; }
+
+.pinpad { margin-top: 14px; padding: 14px; border-radius: 20px; background: #4a3410; text-align: center; }
+.pinpad p { margin: 0 0 10px; color: #ffd28a; font-weight: bold; }
+
+/* the big buttons */
+.pad { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 18px 0; }
+.key { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 1.05rem; font-weight: bold; padding: 22px 0; }
+.key b { font-size: 2rem; line-height: 1; }
+.key.ch { background: linear-gradient(180deg, #ffa04a, var(--accent)); color: #241200; box-shadow: 0 5px 0 #7a3a00; }
+.key.flat { flex-direction: row; justify-content: center; font-size: 1rem; font-weight: normal; padding: 14px 0; }
+
+h2 { font-size: 1rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin: 22px 4px 10px; }
+.channels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.ch-btn {
+  display: flex; align-items: center; gap: 10px; text-align: left; border: 2px solid transparent; border-radius: 16px;
+  padding: 12px; background: var(--panel); box-shadow: 0 5px 0 #0b0c1d;
+}
+.ch-btn.on { border-color: var(--accent); }
+.ch-btn img { width: 44px; height: 34px; object-fit: contain; flex: none; }
+.ch-btn .n { display: block; color: var(--accent); font-weight: bold; font-size: 1.3rem; }
+.ch-btn .t { display: block; font-size: 0.9rem; overflow-wrap: anywhere; }
+
+footer { margin: 28px 0 12px; text-align: center; color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+footer b { color: var(--text); user-select: text; -webkit-user-select: text; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  background: #000; color: #fff; padding: 10px 18px; border-radius: 12px; z-index: 10; max-width: 90vw;
+}

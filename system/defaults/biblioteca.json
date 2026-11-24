@@ -1,0 +1,29 @@
+{
+  "categories": [
+    {
+      "tag": "manana",
+      "label": "Mañana",
+      "programs": []
+    },
+    {
+      "tag": "dibujos",
+      "label": "Dibujos animados",
+      "programs": []
+    },
+    {
+      "tag": "educativo",
+      "label": "Educativos",
+      "programs": []
+    },
+    {
+      "tag": "peliculas",
+      "label": "Películas",
+      "programs": []
+    },
+    {
+      "tag": "videos_musicales",
+      "label": "Videos musicales",
+      "programs": []
+    }
+  ]
+}

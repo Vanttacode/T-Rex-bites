@@ -12,6 +12,16 @@ label install
     kernel vesamenu.c32
     append trexbites-confirm.cfg
 
+label linux
+    menu label Instalar al lado de otro ^Linux (Fedora...)
+    kernel vesamenu.c32
+    append trexbites-confirm-linux.cfg
+
+label dual
+    menu label Instalar al lado de ^Windows
+    kernel vesamenu.c32
+    append trexbites-confirm-libre.cfg
+
 label disk
     menu label ^Salir (arrancar normalmente desde el disco)
     localboot 0x80

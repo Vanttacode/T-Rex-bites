@@ -20,19 +20,9 @@ d-i user-setup/allow-password-weak boolean true
 d-i clock-setup/utc boolean true
 d-i time/zone string @TIMEZONE@
 
-# Disk: use the whole first disk, no questions.
-# The boot menu already asked the person to confirm erasing it.
-d-i partman-auto/method string regular
-d-i partman-auto/choose_recipe select atomic
-d-i partman-lvm/device_remove_lvm boolean true
-d-i partman-md/device_remove_md boolean true
-d-i partman-lvm/confirm boolean true
-d-i partman-lvm/confirm_nooverwrite boolean true
-d-i partman-partitioning/confirm_write_new_label boolean true
-d-i partman/choose_partition select finish
-d-i partman/confirm boolean true
-d-i partman/confirm_nooverwrite boolean true
-d-i partman-efi/non_efi_system boolean true
+# Disk (filled in by build-iso.sh): whole disk, or only the free space next to
+# another system
+@DISK_LINES@
 
 # Packages: minimal system; T-Rex Bites adds the rest from the USB or the internet
 d-i apt-setup/non-free-firmware boolean true
@@ -45,9 +35,8 @@ popularity-contest popularity-contest/participate boolean false
 @PACKAGE_LINES@
 
 # Boot loader
-d-i grub-installer/only_debian boolean true
-d-i grub-installer/with_other_os boolean false
 d-i grub-installer/bootdev string default
+@GRUB_LINES@
 
 # Install T-Rex Bites itself. If anything fails here (for example a slow
 # network), trexbites-firstboot.service finishes the job on the first boot.

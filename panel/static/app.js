@@ -96,13 +96,29 @@ async function submitPin() {
 
 // ---------- tabs ----------
 
+const PAGES = {
+  remote: ["Control", "Cambia de canal y el volumen. En el teléfono, abre http://control.local: es solo el control remoto."],
+  library: ["Biblioteca", "Todos los videos de la tele, en categorías y programas. Arrastra videos a una carpeta para subirlos."],
+  channels: ["Canales", "Cada canal elige qué pasar de la biblioteca, y tiene sus comerciales, logo y ajustes."],
+  settings: ["Ajustes", "WiFi, hora de dormir, opciones de la tele, canal guía, respaldo y actualizaciones."],
+};
+// old addresses (#upload, #more, ...) still open something sensible
+const PAGE_ALIASES = { upload: "library", schedule: "channels", more: "settings" };
+const wide = window.matchMedia("(min-width: 1000px)");
+let currentTab = "remote";
+
 function showTab(name) {
+  name = PAGE_ALIASES[name] || name;
+  if (!PAGES[name]) name = "remote";
+  currentTab = name;
   document.querySelectorAll(".tab").forEach((t) => { t.hidden = t.id !== `tab-${name}`; });
   document.querySelectorAll(".tabbar button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  if (name === "library") renderLibrary();
-  if (name === "upload") refreshDisk();
-  if (name === "schedule") openScheduleTab();
-  if (name === "more") openMoreTab();
+  $("page-title").textContent = PAGES[name][0];
+  $("page-sub").textContent = PAGES[name][1];
+  if (location.hash !== `#${name}`) history.replaceState(null, "", `#${name}`);
+  if (name === "library") openLibraryTab();
+  if (name === "channels") openChannelsTab();
+  if (name === "settings") openSettingsTab();
 }
 
 // ---------- remote ----------
@@ -124,6 +140,9 @@ async function refreshStatus() {
     const asleep = s.power && s.power.state === "off";
     const notTv = s.power && s.power.state !== "on";
     $("onair").hidden = !s.online || notTv;
+    $("onair-desk").hidden = !s.online || notTv;
+    const playing = s.online && !notTv ? (s.player || {}).channel_number : null;
+    if (playing !== currentChannel) { currentChannel = playing; renderChannelButtons(); }
     $("sleeping").hidden = !asleep;
     const p = s.player || {};
     const now = $("now-playing");
@@ -134,68 +153,96 @@ async function refreshStatus() {
     } else {
       now.replaceChildren(
         "Canal ", el("b", {}, String(p.channel_number ?? "?")),
-        ` · ${p.network_name || ""}`, el("br"),
+        ` · ${(channelsCache.find((c) => c.number === p.channel_number) || {}).long_name || p.network_name || ""}`, el("br"),
         p.title ? `Ahora: ${p.title}` : "Sin programa en este momento",
       );
     }
+    $("pin-pad-card").hidden = !(s.online && !notTv && p.awaiting_pin);
     const working = Object.entries(s.rebuilds || {}).filter(([, r]) => r.status === "waiting" || r.status === "running");
     if (working.length) now.append(el("br"), el("span", { class: "muted" }, "Actualizando la programación…"));
   } catch (_) { /* toast already shown or logged out */ }
 }
 
+let currentChannel = null;
+
 function renderChannelButtons() {
   $("channel-buttons").replaceChildren(...channelsCache.map((c) => el("button", {
-    class: "chbtn", onclick: () => sendRemote("channel", c.number),
-  }, el("span", { class: "num" }, String(c.number)), c.long_name)));
+    class: "chbtn" + (c.number === currentChannel ? " current" : ""), onclick: () => sendRemote("channel", c.number),
+    title: `Poner el canal ${c.number}`,
+  }, el("img", { class: "chlogo", alt: "", loading: "lazy",
+    src: `/api/channels/${encodeURIComponent(c.name)}/logo?v=${c.logo && c.logo.custom ? "c" : "d"}` }),
+  el("span", { class: "chtext" }, el("span", { class: "num" }, String(c.number)), el("span", {}, c.long_name)))));
+}
+
+async function sendDigit(d) {
+  try {
+    await api(`/api/remote/digit/${d}`, { method: "POST" });
+    if (navigator.vibrate) navigator.vibrate(20);
+    setTimeout(refreshStatus, 900);
+  } catch (e) { toast(e.message); }
 }
 
 // ---------- channels / upload ----------
 
+let libraryCache = { categories: [], content: [], folders: [] };
+let whenNames = null;
+
 async function loadChannels() {
   const data = await api("/api/channels");
   channelsCache = data.channels;
+  libraryCache = data.library;
+  whenNames = data.when;
   renderChannelButtons();
-  const sel = $("up-channel");
-  const previous = sel.value;
-  sel.replaceChildren(...channelsCache.map((c) => el("option", { value: c.name }, `${c.number} · ${c.long_name}`)));
-  if (previous) sel.value = previous;
-  fillTags();
+  showProblems(data.problems || {});
+  return data;
 }
 
-function fillTags() {
-  const ch = channelsCache.find((c) => c.name === $("up-channel").value);
-  const tagSel = $("up-tag");
-  tagSel.replaceChildren(...(ch ? ch.folders : []).map((f) => el("option", { value: f.tag ?? "" }, f.label)));
-  tagSel.parentElement.hidden = !ch || (ch.folders.length === 1 && ch.folders[0].tag === null);
+function showProblems(problems) {
+  const names = Object.keys(problems);
+  let box = $("problems");
+  if (!names.length) { if (box) box.remove(); return; }
+  if (!box) {
+    box = el("div", { class: "card warning", id: "problems" });
+    $("tab-remote").prepend(box);
+  }
+  const long = (n) => (channelsCache.find((c) => c.name === n) || { long_name: n }).long_name;
+  box.replaceChildren(el("b", {}, "⚠️ No se pudo armar la programación de: " + names.map(long).join(", ")),
+    el("br"), el("small", {}, "Revisa que tengan videos. Se reintenta solo al subir, mover o guardar."));
 }
 
-async function refreshDisk() {
-  try {
-    const d = await api("/api/disk");
-    $("disk-info").textContent = `Espacio libre en la tele: ${formatSize(d.free)} de ${formatSize(d.total)}`;
-  } catch (_) { /* ignore */ }
+function fmtDuration(sec) {
+  if (sec == null) return "";
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
 
-function uploadFiles(files) {
-  const channel = $("up-channel").value;
-  const tag = $("up-tag").value;
-  if (!channel) { toast("Primero elige un canal"); return; }
-  [...files].forEach((file) => uploadOne(file, channel, tag));
-}
+// ---------- uploads: one at a time, shown in a small dock ----------
 
-// one upload at a time keeps an old laptop and the home WiFi responsive
 let uploadQueue = Promise.resolve();
+let uploadsPending = 0;
+const afterUpload = [];   // callbacks to refresh whatever screen is open
 
-function uploadOne(file, channel, tag) {
+function uploadFiles(files, channel, tag, where, when = {}) {
+  [...files].forEach((file) => uploadOne(file, channel, tag, where, when));
+}
+
+function uploadOne(file, channel, tag, where, when) {
   const bar = el("div");
   const label = el("span", {}, "En espera…");
-  const item = el("li", {}, el("b", {}, file.name), el("br"), label, el("div", { class: "bar" }, bar));
+  const item = el("li", {}, el("b", {}, file.name), el("small", { class: "muted" }, `  → ${where}`), el("br"), label,
+    el("div", { class: "bar" }, bar));
   $("upload-list").prepend(item);
+  $("uploads-dock").hidden = false;
+  uploadsPending += 1;
+  $("uploads-title").textContent = `Subiendo ${uploadsPending}…`;
 
   uploadQueue = uploadQueue.then(() => new Promise((resolve) => {
     const form = new FormData();
-    form.append("channel", channel);
-    form.append("tag", tag);
+    if (channel) form.append("channel", channel);
+    form.append("tag", tag || "");
+    for (const [k, v] of Object.entries(when || {})) if (v) form.append(k, v);
     form.append("file", file);
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/upload");
@@ -205,69 +252,42 @@ function uploadOne(file, channel, tag) {
       bar.style.width = pct + "%";
       label.textContent = `Subiendo… ${pct}% (${formatSize(ev.loaded)} de ${formatSize(ev.total)})`;
     };
+    const done = () => {
+      uploadsPending -= 1;
+      $("uploads-title").textContent = uploadsPending ? `Subiendo ${uploadsPending}…` : "✅ Subidas terminadas";
+      resolve();
+      if (!uploadsPending) afterUpload.forEach((fn) => fn());
+    };
     xhr.onload = () => {
       let detail = "";
       try { detail = JSON.parse(xhr.responseText).detail || ""; } catch (_) { /* ignore */ }
       if (xhr.status === 200) {
         bar.style.width = "100%";
-        label.textContent = "✅ Listo. Aparecerá en la programación en unos minutos.";
+        label.textContent = "✅ Listo. Los canales que lo usan lo pasan en unos minutos.";
       } else {
         item.classList.add("failed");
         label.textContent = `❌ ${detail || "Error " + xhr.status}`;
         if (xhr.status === 401) showLogin();
       }
-      refreshDisk();
-      resolve();
+      done();
     };
     xhr.onerror = () => {
       item.classList.add("failed");
       label.textContent = "❌ Se cortó la conexión con la tele.";
-      resolve();
+      done();
     };
     xhr.send(form);
   }));
 }
 
-// ---------- library ----------
-
-async function renderLibrary() {
-  const root = $("library");
-  try {
-    await loadChannels();
-  } catch (e) {
-    root.replaceChildren(el("p", { class: "error" }, e.message));
-    return;
-  }
-  root.replaceChildren(...channelsCache.map((c) => {
-    const card = el("div", { class: "card" }, el("h2", {}, `${c.number} · ${c.long_name}`));
-    for (const f of c.folders) {
-      const block = el("div", { class: "lib-folder" }, el("h3", {}, `${f.label} (${f.videos.length})`));
-      if (!f.videos.length) block.append(el("p", { class: "muted" }, "Todavía no hay videos aquí."));
-      for (const v of f.videos) {
-        const name = el("span", { class: "name" }, v.name);
-        if (v.placeholder) name.append(el("span", { class: "badge" }, "de ejemplo"));
-        block.append(el("div", { class: "video-row" }, name,
-          el("span", { class: "size" }, formatSize(v.size)),
-          el("button", { class: "btn danger", "aria-label": `Borrar ${v.name}`, onclick: () => deleteVideo(c, f, v) }, "🗑")));
-      }
-      card.append(block);
-    }
-    return card;
-  }));
+// a hidden file picker shared by every "Subir" button
+function pickFiles(onFiles) {
+  const picker = $("file-picker");
+  picker.onchange = () => { onFiles(picker.files); picker.value = ""; };
+  picker.click();
 }
 
-async function deleteVideo(channel, folder, video) {
-  if (!confirm(`¿Borrar "${video.name}" de ${channel.long_name}?`)) return;
-  try {
-    await api("/api/library/delete", { json: { channel: channel.name, tag: folder.tag, name: video.name } });
-    toast("Video borrado");
-    renderLibrary();
-  } catch (e) {
-    toast(e.message);
-  }
-}
-
-// ---------- settings ----------
+// ---------- settings: PIN ----------
 
 async function savePin() {
   const msg = $("pin-msg");
@@ -285,6 +305,8 @@ async function savePin() {
 
 // ---------- start ----------
 
+// ---------- start ----------
+
 async function startApp(pinIsDefault) {
   $("view-login").hidden = true;
   $("view-app").hidden = false;
@@ -294,18 +316,18 @@ async function startApp(pinIsDefault) {
     const w = await api("/api/wifi");
     wifiSetup = !!(w.hotspot || w.needs_setup);
   } catch (_) { /* panel without WiFi support */ }
+  try { await loadChannels(); } catch (e) { toast(e.message); }
   if (wifiSetup) {
     // opened from the "T-Rex Bites Config" network: WiFi first
-    showTab("more");
+    showTab("settings");
     $("wifi-card").scrollIntoView();
   } else if (pinIsDefault) {
-    showTab("more");
+    showTab("settings");
     $("pin-card").scrollIntoView();
     toast("Por seguridad, cambia el PIN de fábrica");
   } else {
-    showTab("remote");
+    showTab(location.hash.slice(1).split("/")[0] || "remote");
   }
-  try { await loadChannels(); } catch (e) { toast(e.message); }
   refreshStatus();
   clearInterval(startApp.timer);
   startApp.timer = setInterval(() => { if (!document.hidden) refreshStatus(); }, 10000);
@@ -315,15 +337,21 @@ function wireUp() {
   buildKeypad();
   document.querySelectorAll("[data-remote]").forEach((b) => b.addEventListener("click", () => sendRemote(b.dataset.remote)));
   document.querySelectorAll(".tabbar button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
-  $("up-channel").addEventListener("change", fillTags);
-  $("up-files").addEventListener("change", (e) => { uploadFiles(e.target.files); e.target.value = ""; });
-  const dz = $("dropzone");
-  dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("over"); });
-  dz.addEventListener("dragleave", () => dz.classList.remove("over"));
-  dz.addEventListener("drop", (e) => { e.preventDefault(); dz.classList.remove("over"); uploadFiles(e.dataTransfer.files); });
+  const tvKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", ""];
+  $("tv-keypad").replaceChildren(...tvKeys.map((k) => el("button", {
+    class: "key", type: "button", onclick: () => k && sendDigit(k === "⌫" ? "clear" : k),
+  }, k)));
+  $("uploads-close").addEventListener("click", () => {
+    $("uploads-dock").hidden = true;
+    if (!uploadsPending) $("upload-list").replaceChildren();
+  });
   $("pin-save").addEventListener("click", savePin);
   $("logout").addEventListener("click", async () => { await api("/api/logout", { method: "POST" }); showLogin(); });
   $("advanced-link").href = `http://${location.hostname}:4242/`;
+  window.addEventListener("hashchange", () => {
+    const t = location.hash.slice(1).split("/")[0];
+    if (t && t !== currentTab && !$("view-app").hidden) showTab(t);
+  });
   document.addEventListener("keydown", (e) => {
     if ($("view-login").hidden) return;
     if (/^[0-9]$/.test(e.key)) pressKey(e.key);
@@ -332,7 +360,8 @@ function wireUp() {
   });
 }
 
-(async function init() {
+// every script is loaded by DOMContentLoaded (library.js, channels.js, ...)
+window.addEventListener("DOMContentLoaded", async function init() {
   wireUp();
   try {
     const s = await api("/api/session");
@@ -341,4 +370,4 @@ function wireUp() {
   } catch (_) {
     showLogin();
   }
-})();
+});

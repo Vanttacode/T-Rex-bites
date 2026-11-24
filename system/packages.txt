@@ -7,15 +7,23 @@ curl
 python3
 python3-venv
 python3-pip
+# FieldStation42 draws its guide channel with Tkinter: without it the player
+# stops right at start (ModuleNotFoundError: tkinter) and the screen stays black
+python3-tk
 mpv
 ffmpeg
 fonts-dejavu-core
+# icons on the WiFi setup screen (🔒 ⌨ 📱 🔌)
+fonts-noto-color-emoji
 xserver-xorg-core
 xserver-xorg-video-all
 xserver-xorg-input-all
 xinit
 x11-xserver-utils
 libxcb-cursor0
+# the channel logo (Qt overlay) does not start without these two
+libxcb-icccm4
+libxcb-keysyms1
 libgl1
 libegl1
 libxkbcommon-x11-0
@@ -31,7 +39,19 @@ dnsmasq-base
 nftables
 polkitd
 wireless-regdb
+# boot menu: finds a Linux or Windows already on the disk
+os-prober
+# security updates on their own, and a compositor so the channel logo is
+# drawn transparently over the video
+unattended-upgrades
+picom
 avahi-daemon
+# control.local: second name for the phone remote
+avahi-utils
 libnss-mdns
 mesa-va-drivers
 mesa-vdpau-drivers
+# importar videos desde un pendrive
+udisks2
+ntfs-3g
+exfatprogs

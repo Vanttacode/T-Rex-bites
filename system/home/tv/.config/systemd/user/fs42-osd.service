@@ -1,0 +1,14 @@
+# Channel logo, channel number and volume bar drawn over the TV picture
+# (FieldStation42's on-screen display). Starts and stops with the player.
+[Unit]
+Description=T-Rex Bites - logo y número de canal en pantalla
+After=fs42.service
+PartOf=fs42.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/trexbites/fieldstation42
+ExecStartPre=/bin/sleep 8
+ExecStart=/opt/trexbites/fieldstation42/env/bin/python3 fs42/osd/main.py
+Restart=always
+RestartSec=5

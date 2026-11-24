@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Control · T-Rex Bites</title>
+  <meta name="theme-color" content="#12142b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Control TV">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/static/remote.webmanifest">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <link rel="stylesheet" href="/static/remote.css">
+</head>
+<body>
+  <!-- PIN -->
+  <section id="login" class="login" hidden>
+    <img src="/static/icon.svg" alt="" class="login-logo">
+    <h1>Control de la tele</h1>
+    <p class="muted">Ingresa el PIN de padres</p>
+    <div class="dots" id="dots"></div>
+    <div class="keypad" id="login-keys"></div>
+    <p class="error" id="login-error" role="alert"></p>
+  </section>
+
+  <!-- Remote -->
+  <main id="remote" hidden>
+    <header class="now" id="now">
+      <img id="now-logo" alt="" class="now-logo">
+      <div class="now-text">
+        <div class="now-ch" id="now-ch">Conectando…</div>
+        <div class="now-title" id="now-title"></div>
+      </div>
+      <button class="power" id="power" aria-label="Apagar o encender la tele">⏻</button>
+    </header>
+
+    <div class="pinpad" id="pinpad" hidden>
+      <p>🔒 Este canal pide PIN</p>
+      <div class="keypad small" id="tv-keys"></div>
+    </div>
+
+    <div class="pad">
+      <button class="key ch up" data-a="up" aria-label="Canal siguiente">CH<b>▲</b></button>
+      <button class="key vol up" data-a="volume_up" aria-label="Subir volumen">VOL<b>＋</b></button>
+      <button class="key ch down" data-a="down" aria-label="Canal anterior">CH<b>▼</b></button>
+      <button class="key vol down" data-a="volume_down" aria-label="Bajar volumen">VOL<b>－</b></button>
+      <button class="key flat" data-a="mute">🔇 Silencio</button>
+      <button class="key flat" data-a="guide">📺 Guía</button>
+    </div>
+
+    <h2>Canales</h2>
+    <div class="channels" id="channels"></div>
+
+    <footer>
+      <p>Para subir videos y armar la programación, abre en el computador<br><b>http://trexbites.local</b></p>
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script src="/static/remote.js"></script>
+</body>
+</html>

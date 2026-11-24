@@ -1,0 +1,3 @@
+// T-Rex Bites: install Debian's security updates automatically when online
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";

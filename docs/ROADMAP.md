@@ -16,24 +16,54 @@
 - [ ] Instalar en el notebook Lenovo y anotar qué falla (WiFi, video, sonido).
 - [x] Mostrar en la tele la IP del equipo cuando `trexbites.local` no funcione.
 - [x] Configurar y cambiar la red WiFi desde el teléfono (red "T-Rex Bites Config" + portal cautivo).
-- [ ] Convertir automáticamente los videos pesados a un formato liviano
-      (H.264 720p) para equipos lentos.
+- [x] Convertir automáticamente los videos pesados a un formato liviano
+      (H.264 720p) para equipos lentos, con volumen parejo.
 
 ## 🎨 Fase 3: look de los 2000
 
-- [ ] Logo T-Rex Bites en la esquina (mosca de canal).
-- [ ] Cortinillas y "bumpers" propios entre programas.
-- [ ] Estática y sonido al cambiar de canal.
-- [ ] Guía de programación con estilo cable de los 2000.
+- [x] Logo en la esquina (mosca de canal), propio por canal, y número de canal al cambiar.
+- [x] Comerciales propios por canal: al final, repartidos o a la mitad del programa.
+- [x] Cortinillas y "bumpers" propios entre programas, y videos fijos al inicio o fin de un bloque.
+- [x] Estática y sonido al cambiar de canal.
+- [x] Guía de programación con estilo cable de los 2000 (canal guía) y canal de música.
 - [ ] Pantalla de "fin de transmisión" T-Rex.
 
 ## 👨‍👧 Fase 4: para padres
 
-- [x] Grilla semanal de programación por canal (pintar horas con categorías o fin de transmisión).
+- [x] Editor de programación en el computador: línea de tiempo semanal con bloques, capítulos en orden, mezclas al azar, duración de videos, tandas por bloque, copiar días, programación al azar y duplicar canal.
+- [ ] Bloques de media hora y programación por fecha (feriados, cumpleaños).
 - [x] Hora de dormir: apagado automático con pantalla "¡A dormir!", "Apagar hasta mañana" y "1 hora extra".
 - [x] Crear, renombrar, renumerar y borrar canales, con sus categorías.
 - [x] Historial: qué pasó la tele cada día y cuántos minutos.
-- [ ] Botón "Actualizar T-Rex Bites" en el panel.
+- [x] Botón "Actualizar T-Rex Bites" en el panel (desde GitHub Releases) y actualizaciones de seguridad automáticas.
 - [ ] Límite diario de minutos (necesita un botón de encendido: control remoto físico).
-- [ ] Ver el canal en vivo desde el navegador (otra tele de la casa).
+- [x] Ver el canal en vivo desde el navegador (otra tele de la casa).
 - [ ] Imagen para Raspberry Pi.
+
+## ✅ Versión 0.5
+
+- [x] Programas dentro de categorías (Dibujos animados → Bluey).
+- [x] Pautas comerciales por bloque y comerciales por momento del día, día o mes.
+- [x] Canales con PIN.
+- [x] Importar desde pendrive, biblioteca con miniaturas, duración, búsqueda, repetidos y mover.
+- [x] Respaldo y restauración de la configuración.
+
+## ✅ Versión 0.6
+
+- [x] Biblioteca única con categorías y programas, compartida por todos los canales.
+- [x] Canales "Todo el día" (eligen categorías o programas) y "Con horario".
+- [x] Elegir varios videos y moverlos o borrarlos juntos.
+- [x] Mudanza automática de los canales anteriores a la biblioteca.
+
+## ✅ Versión 0.7
+
+- [x] Panel ordenado en 4 secciones: Control, Biblioteca, Canales y Ajustes.
+- [x] Página por canal (Programación, Comerciales, Apariencia, Ajustes) con el editor por hora integrado.
+- [x] Subir arrastrando a la carpeta abierta; categorías y programas se crean ahí mismo.
+- [x] Nuevo canal paso a paso.
+
+## 🔜 Después
+
+- [ ] Imagen para Raspberry Pi.
+- [ ] Versión programa (Linux y Windows), sin instalar un sistema.
+- [ ] Programación por fecha (feriados, cumpleaños).

@@ -1,0 +1,14 @@
+# Second network name for the TV: http://control.local opens the phone remote.
+[Unit]
+Description=T-Rex Bites - nombre control.local en la red
+After=avahi-daemon.service network-online.target
+Wants=avahi-daemon.service
+
+[Service]
+Type=simple
+ExecStart=/opt/trexbites/bin/trexbites-alias control.local
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
