@@ -46,6 +46,8 @@ os-prober
 unattended-upgrades
 picom
 avahi-daemon
+# control.local: second name for the phone remote
+avahi-utils
 libnss-mdns
 mesa-va-drivers
 mesa-vdpau-drivers

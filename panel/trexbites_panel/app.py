@@ -46,6 +46,8 @@ POWER_BACKEND = os.environ.get("TREXBITES_POWER", "systemd")
 WIFI_BACKEND = os.environ.get("TREXBITES_WIFI", "nmcli")
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 STATE_DIR = STATE_PATH.parent
+# second name the TV announces on the network: the phone remote
+REMOTE_HOST = os.environ.get("TREXBITES_REMOTE_HOST", "control.local")
 MEDIA_CACHE = Path(os.environ.get("TREXBITES_MEDIA_CACHE", str(STATE_DIR / "media.json")))
 THUMBS_DIR = Path(os.environ.get("TREXBITES_THUMBS", str(STATE_DIR / "thumbs")))
 # fs42.service reads TREX_TRANSITION (channel change effect) from here
@@ -104,7 +106,7 @@ async def announce_address(app_):
     """Once online, show on the TV where the panel is, in case trexbites.local fails."""
     wifi = app_.state.wifi
     ip = wifi.status_cache.get("ip")
-    message = "Entra desde tu teléfono a http://trexbites.local"
+    message = "Control remoto: http://control.local  ·  Panel: http://trexbites.local"
     if ip:
         message += f"  ·  o a http://{ip}"
     try:
@@ -391,8 +393,22 @@ def media_root():
 # ---------- pages ----------
 
 @app.get("/", include_in_schema=False)
-async def index():
+async def index(request: Request):
+    """http://control.local is the phone remote; http://trexbites.local the full panel."""
+    if is_remote_host(request):
+        return FileResponse(STATIC_DIR / "remote.html", headers={"Cache-Control": "no-cache"})
     return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/control", include_in_schema=False)
+async def remote_page():
+    """The remote also lives here, for phones that don't find control.local."""
+    return FileResponse(STATIC_DIR / "remote.html", headers={"Cache-Control": "no-cache"})
+
+
+def is_remote_host(request: Request):
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    return host == REMOTE_HOST or host.startswith(REMOTE_HOST.split(".")[0] + ".")
 
 
 @app.get("/programacion", include_in_schema=False)
@@ -402,8 +418,9 @@ async def schedule_editor():
 
 
 @app.get("/manifest.webmanifest", include_in_schema=False)
-async def manifest():
-    return FileResponse(STATIC_DIR / "manifest.webmanifest", media_type="application/manifest+json")
+async def manifest(request: Request):
+    name = "remote.webmanifest" if is_remote_host(request) else "manifest.webmanifest"
+    return FileResponse(STATIC_DIR / name, media_type="application/manifest+json")
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -488,6 +505,23 @@ async def remote(action: str, request: Request, channel: int | None = None):
     except FS42Error as e:
         raise HTTPException(status_code=502, detail=str(e))
     return {"ok": True}
+
+
+@app.get("/api/remote-channels", dependencies=[Depends(require_session)])
+async def remote_channels():
+    """What the phone remote needs: just the channels, no video lists."""
+    result = []
+    for conf in channels.load_stations(FS42_DIR / "confs"):
+        if channels.is_channel(conf):
+            result.append({"name": conf["network_name"],
+                           "long_name": conf.get("network_long_name") or conf["network_name"],
+                           "number": conf.get("channel_number"),
+                           "custom_logo": channels.logo_file(conf, FS42_DIR) is not None})
+        elif conf.get("network_type") == "guide":
+            result.append({"name": conf["network_name"], "long_name": "Guía de canales",
+                           "number": conf.get("channel_number"), "guide": True, "custom_logo": False})
+    result.sort(key=lambda c: c["number"] or 0)
+    return {"channels": result}
 
 
 @app.get("/api/status", dependencies=[Depends(require_session)])

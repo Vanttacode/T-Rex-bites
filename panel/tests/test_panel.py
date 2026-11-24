@@ -126,3 +126,18 @@ def test_remote_reports_when_tv_is_offline(env):
     assert c.post("/api/remote/explode").status_code == 400
     status = c.get("/api/status").json()
     assert status["online"] is False
+
+
+def test_control_local_serves_the_phone_remote(env):
+    c = env["client"]
+    panel = c.get("/", headers={"host": "trexbites.local"})
+    assert "manage.js" in panel.text
+    remote = c.get("/", headers={"host": "control.local"})
+    assert "remote.js" in remote.text and "manage.js" not in remote.text
+    assert "remote.js" in c.get("/control").text
+    assert c.get("/manifest.webmanifest", headers={"host": "control.local"}).json()["short_name"] == "Control TV"
+    assert c.get("/api/remote-channels").status_code == 401
+    login(c)
+    chans = c.get("/api/remote-channels").json()["channels"]
+    assert [(ch["number"], ch["long_name"]) for ch in chans] == [(3, "T-Rex TV"), (5, "Dino Loop")]
+    assert "folders" not in chans[0]

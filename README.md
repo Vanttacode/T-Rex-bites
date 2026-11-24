@@ -98,6 +98,15 @@ El PIN de fábrica es **1234** y el panel te pide cambiarlo la primera vez.
 Para tenerlo como app en el teléfono, en el navegador usa
 **"Agregar a pantalla de inicio"**.
 
+**Dos direcciones:**
+
+| Dirección | Para qué |
+|---|---|
+| 📱 **http://control.local** | Solo el **control remoto**, para el teléfono: canales con su logo, volumen, guía, encender/apagar y PIN de canales. Se puede "Agregar a pantalla de inicio" como app |
+| 💻 **http://trexbites.local** | El **panel completo**, para el computador |
+
+Si algún teléfono no encuentra `control.local`, el control también está en `http://trexbites.local/control`.
+
 El panel tiene **4 secciones**: en el teléfono están abajo y en el computador en un menú lateral.
 
 | Sección | Para qué |

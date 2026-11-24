@@ -97,7 +97,7 @@ async function submitPin() {
 // ---------- tabs ----------
 
 const PAGES = {
-  remote: ["Control", "Cambia de canal, sube o baja el volumen, mira qué está dando."],
+  remote: ["Control", "Cambia de canal y el volumen. En el teléfono, abre http://control.local: es solo el control remoto."],
   library: ["Biblioteca", "Todos los videos de la tele, en categorías y programas. Arrastra videos a una carpeta para subirlos."],
   channels: ["Canales", "Cada canal elige qué pasar de la biblioteca, y tiene sus comerciales, logo y ajustes."],
   settings: ["Ajustes", "WiFi, hora de dormir, opciones de la tele, canal guía, respaldo y actualizaciones."],

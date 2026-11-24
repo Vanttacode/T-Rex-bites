@@ -306,6 +306,7 @@ step "Instalando las actualizaciones a distancia"
 install -m 644 "$SRC_DIR/VERSION" "$PREFIX/VERSION" 2>/dev/null || echo "0.0.0" > "$PREFIX/VERSION"
 install -d "$PREFIX/bin"
 install -m 755 "$SRC_DIR/system/trexbites-update.sh" "$PREFIX/bin/trexbites-update"
+install -m 755 "$SRC_DIR/system/trexbites-alias.sh" "$PREFIX/bin/trexbites-alias"
 install -m 644 "$SRC_DIR/upstream/trexbites.conf" "$PREFIX/trexbites.conf"
 
 # ---------------------------------------------------------------------------
@@ -381,7 +382,7 @@ if [ -f /etc/default/grub ]; then
     update-grub || true
 fi
 
-systemctl enable avahi-daemon.service NetworkManager.service trexbites-panel.service
+systemctl enable avahi-daemon.service NetworkManager.service trexbites-panel.service trexbites-control-name.service
 systemctl enable trexbites-firstboot.service
 systemctl set-default multi-user.target
 
@@ -427,11 +428,12 @@ if [ "$OFFLINE" = 1 ]; then
 fi
 echo
 echo "=== T-Rex Bites quedó instalado $(date) ==="
-echo "Reinicia el equipo. Luego abre http://$HOSTNAME_TV.local desde tu teléfono (PIN 1234)."
+echo "Reinicia el equipo. Luego abre http://$HOSTNAME_TV.local en el computador y http://control.local en el teléfono (PIN 1234)."
 
 if [ "$LIVE_SYSTEMD" = 1 ]; then
     systemctl daemon-reload
     systemctl restart avahi-daemon.service trexbites-panel.service || true
+    systemctl restart trexbites-control-name.service || true
     # the tv user's own services (player, logo, bedtime screen)
     systemctl --user --machine="$TV_USER@" daemon-reload 2>/dev/null || true
     if systemctl --user --machine="$TV_USER@" is-active --quiet fs42.service 2>/dev/null; then
